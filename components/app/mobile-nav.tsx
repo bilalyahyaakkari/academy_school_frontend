@@ -98,16 +98,22 @@ export function MobileNav({ academyName }: { academyName: string }) {
                         href={item.href}
                         onClick={() => setOpen(false)}
                         className={cn(
-                          "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                          "flex min-h-11 items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium transition-all active:scale-[0.98]",
                           active
                             ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25"
-                            : "text-slate-400 hover:bg-slate-800/60 hover:text-white",
+                            : "text-slate-400 hover:bg-slate-800/60 hover:text-white active:bg-slate-800/80",
                         )}
                       >
-                        <Icon className="size-4 shrink-0" />
+                        <Icon className="size-5 shrink-0" />
                         <span className="flex-1 truncate">
                           {t(item.labelKey)}
                         </span>
+                        {active && (
+                          <span
+                            aria-hidden
+                            className="size-1.5 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+                          />
+                        )}
                       </Link>
                     );
                   })}

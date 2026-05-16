@@ -69,9 +69,66 @@ export function PaymentsTable({
     });
   };
 
+  const renderActions = (r: Row) => (
+    <div className="flex items-center justify-end gap-1">
+      {r.payment && r.payment.status !== "PAID" && (
+        <Button
+          size="sm"
+          onClick={() =>
+            setRecordingFor({
+              payment: r.payment!,
+              studentName: r.studentName,
+            })
+          }
+        >
+          <CreditCard className="size-4" />
+          {t("payments.action.record")}
+        </Button>
+      )}
+      {r.payment && r.payment.status === "PAID" && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => undoPaid(r)}
+          disabled={pendingId === r.payment.id}
+        >
+          {pendingId === r.payment.id ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <RotateCcw className="size-4" />
+          )}
+          {t("payments.action.undo")}
+        </Button>
+      )}
+      {r.payment && (
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => setEditing(r.payment)}
+          aria-label={t("common.edit")}
+        >
+          <Pencil className="size-4" />
+        </Button>
+      )}
+    </div>
+  );
+
+  const renderStatusBadge = (r: Row) => {
+    if (!r.payment)
+      return (
+        <Badge variant="outline">{t("payments.badge.notGenerated")}</Badge>
+      );
+    if (r.payment.status === "PAID")
+      return <Badge variant="success">{t("common.paid")}</Badge>;
+    if (r.payment.status === "PARTIAL")
+      return <Badge variant="warning">{t("common.partial")}</Badge>;
+    return <Badge variant="secondary">{t("common.unpaid")}</Badge>;
+  };
+
   return (
     <>
-      <Card>
+      {/* ===== Desktop / tablet: table ===== */}
+      <Card className="hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -107,67 +164,56 @@ export function PaymentsTable({
                     </span>
                   )}
                 </TableCell>
-                <TableCell>
-                  {!r.payment ? (
-                    <Badge variant="outline">
-                      {t("payments.badge.notGenerated")}
-                    </Badge>
-                  ) : r.payment.status === "PAID" ? (
-                    <Badge variant="success">{t("common.paid")}</Badge>
-                  ) : r.payment.status === "PARTIAL" ? (
-                    <Badge variant="warning">{t("common.partial")}</Badge>
-                  ) : (
-                    <Badge variant="secondary">{t("common.unpaid")}</Badge>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center justify-end gap-1">
-                    {r.payment && r.payment.status !== "PAID" && (
-                      <Button
-                        size="sm"
-                        onClick={() =>
-                          setRecordingFor({
-                            payment: r.payment!,
-                            studentName: r.studentName,
-                          })
-                        }
-                      >
-                        <CreditCard className="size-4" />
-                        {t("payments.action.record")}
-                      </Button>
-                    )}
-                    {r.payment && r.payment.status === "PAID" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => undoPaid(r)}
-                        disabled={pendingId === r.payment.id}
-                      >
-                        {pendingId === r.payment.id ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                          <RotateCcw className="size-4" />
-                        )}
-                        {t("payments.action.undo")}
-                      </Button>
-                    )}
-                    {r.payment && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setEditing(r.payment)}
-                        aria-label={t("common.edit")}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                    )}
-                  </div>
-                </TableCell>
+                <TableCell>{renderStatusBadge(r)}</TableCell>
+                <TableCell>{renderActions(r)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </Card>
+
+      {/* ===== Mobile: card layout ===== */}
+      <ul className="space-y-2 md:hidden">
+        {rows.map((r) => (
+          <li
+            key={r.studentId}
+            className="rounded-xl border border-border bg-card p-3 shadow-sm"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <Link
+                  href={`/students/${r.studentId}`}
+                  className="block truncate font-semibold hover:underline"
+                >
+                  {r.studentName}
+                </Link>
+                {r.groupName && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {r.groupName}
+                  </p>
+                )}
+              </div>
+              <div className="shrink-0">{renderStatusBadge(r)}</div>
+            </div>
+
+            <div className="mt-3">
+              {r.payment ? (
+                <PaymentProgress payment={r.payment} />
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {t("payments.table.noInvoice")}
+                </p>
+              )}
+            </div>
+
+            {r.payment && (
+              <div className="mt-3 border-t border-border pt-2">
+                {renderActions(r)}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
 
       {editing && (
         <PaymentEditDialog payment={editing} onClose={() => setEditing(null)} />

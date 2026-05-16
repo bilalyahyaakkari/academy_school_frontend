@@ -137,93 +137,170 @@ export function UniformsClient({
           </p>
         </Card>
       ) : (
-        <Card>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t("table.student")}</TableHead>
-                <TableHead className="w-20 text-center">
-                  {t("uniforms.table.size")}
-                </TableHead>
-                <TableHead className="text-end">
-                  {t("uniforms.table.price")}
-                </TableHead>
-                <TableHead>{t("uniforms.table.ordered")}</TableHead>
-                <TableHead>{t("table.status")}</TableHead>
-                <TableHead className="text-end">{t("table.actions")}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((u) => (
-                <TableRow key={u.id}>
-                  <TableCell className="font-medium">
+        <>
+          {/* ===== Desktop / tablet: table ===== */}
+          <Card className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("table.student")}</TableHead>
+                  <TableHead className="w-20 text-center">
+                    {t("uniforms.table.size")}
+                  </TableHead>
+                  <TableHead className="text-end">
+                    {t("uniforms.table.price")}
+                  </TableHead>
+                  <TableHead>{t("uniforms.table.ordered")}</TableHead>
+                  <TableHead>{t("table.status")}</TableHead>
+                  <TableHead className="text-end">{t("table.actions")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell className="font-medium">
+                      <Link
+                        href={`/students/${u.student.id}`}
+                        className="hover:underline"
+                      >
+                        {u.student.fullName}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="outline">{u.size}</Badge>
+                    </TableCell>
+                    <TableCell className="text-end">
+                      {formatCurrency(u.price)}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {formatDate(u.orderedAt)}
+                    </TableCell>
+                    <TableCell>
+                      {u.isPaid ? (
+                        <Badge variant="success">{t("common.paid")}</Badge>
+                      ) : (
+                        <Badge variant="secondary">{t("common.unpaid")}</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant={u.isPaid ? "outline" : "default"}
+                          onClick={() => onTogglePaid(u)}
+                          disabled={pendingId === u.id}
+                        >
+                          {pendingId === u.id ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : u.isPaid ? (
+                            <RotateCcw className="size-4" />
+                          ) : (
+                            <Check className="size-4" />
+                          )}
+                          {u.isPaid
+                            ? t("uniforms.action.undo")
+                            : t("uniforms.action.markPaid")}
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => setEditing(u)}
+                          aria-label={t("common.edit")}
+                        >
+                          <Pencil className="size-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => onDelete(u)}
+                          disabled={pendingId === u.id}
+                          aria-label={t("common.delete")}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
+
+          {/* ===== Mobile: card layout ===== */}
+          <ul className="space-y-2 md:hidden">
+            {filtered.map((u) => (
+              <li
+                key={u.id}
+                className="rounded-xl border border-border bg-card p-3 shadow-sm"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="inline-flex shrink-0 items-center justify-center rounded-md bg-gradient-to-br from-indigo-500 to-blue-600 px-2.5 py-1 text-xs font-bold text-white shadow-sm">
+                    {u.size}
+                  </span>
+                  <div className="min-w-0 flex-1">
                     <Link
                       href={`/students/${u.student.id}`}
-                      className="hover:underline"
+                      className="block truncate font-semibold hover:underline"
                     >
                       {u.student.fullName}
                     </Link>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="outline">{u.size}</Badge>
-                  </TableCell>
-                  <TableCell className="text-end">
-                    {formatCurrency(u.price)}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDate(u.orderedAt)}
-                  </TableCell>
-                  <TableCell>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span className="font-semibold text-foreground">
+                        {formatCurrency(u.price)}
+                      </span>
+                      <span>{formatDate(u.orderedAt)}</span>
+                    </div>
+                  </div>
+                  <div className="shrink-0">
                     {u.isPaid ? (
                       <Badge variant="success">{t("common.paid")}</Badge>
                     ) : (
                       <Badge variant="secondary">{t("common.unpaid")}</Badge>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        size="sm"
-                        variant={u.isPaid ? "outline" : "default"}
-                        onClick={() => onTogglePaid(u)}
-                        disabled={pendingId === u.id}
-                      >
-                        {pendingId === u.id ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : u.isPaid ? (
-                          <RotateCcw className="size-4" />
-                        ) : (
-                          <Check className="size-4" />
-                        )}
-                        {u.isPaid
-                          ? t("uniforms.action.undo")
-                          : t("uniforms.action.markPaid")}
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => setEditing(u)}
-                        aria-label={t("common.edit")}
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => onDelete(u)}
-                        disabled={pendingId === u.id}
-                        aria-label={t("common.delete")}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </Card>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center justify-end gap-1 border-t border-border pt-2">
+                  <Button
+                    size="sm"
+                    variant={u.isPaid ? "outline" : "default"}
+                    onClick={() => onTogglePaid(u)}
+                    disabled={pendingId === u.id}
+                  >
+                    {pendingId === u.id ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : u.isPaid ? (
+                      <RotateCcw className="size-4" />
+                    ) : (
+                      <Check className="size-4" />
+                    )}
+                    {u.isPaid
+                      ? t("uniforms.action.undo")
+                      : t("uniforms.action.markPaid")}
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    onClick={() => setEditing(u)}
+                    aria-label={t("common.edit")}
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => onDelete(u)}
+                    disabled={pendingId === u.id}
+                    aria-label={t("common.delete")}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       {creating && (

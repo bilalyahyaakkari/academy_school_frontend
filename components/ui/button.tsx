@@ -17,10 +17,11 @@ const buttonVariants = cva(
         success: "bg-success text-success-foreground hover:bg-success/90",
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-6",
-        icon: "size-9",
+        // Bumped on mobile for 40px+ tap target; restored to compact h-9/size-9 on sm+.
+        default: "h-10 px-4 py-2 sm:h-9",
+        sm: "h-9 rounded-md px-3 text-xs sm:h-8",
+        lg: "h-11 rounded-md px-6 sm:h-10",
+        icon: "size-10 sm:size-9",
       },
     },
     defaultVariants: { variant: "default", size: "default" },

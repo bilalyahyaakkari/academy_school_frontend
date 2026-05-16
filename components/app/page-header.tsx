@@ -35,18 +35,22 @@ export function PageHeader({
             {/* Decorative accent bar to the left of the title */}
             <span
               aria-hidden
-              className="h-7 w-1 rounded-full bg-gradient-to-b from-primary to-primary/40"
+              className="h-6 w-1 rounded-full bg-gradient-to-b from-primary to-primary/40 sm:h-7"
             />
-            <h1 className="text-3xl font-bold tracking-tight">{title}</h1>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+              {title}
+            </h1>
           </div>
           {description && (
-            <p className="mt-1.5 pl-4 text-sm text-muted-foreground">
+            <p className="mt-1.5 ps-4 text-sm text-muted-foreground">
               {description}
             </p>
           )}
         </div>
         {actions && (
-          <div className="flex flex-wrap items-center gap-2">{actions}</div>
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">
+            {actions}
+          </div>
         )}
       </div>
     </div>

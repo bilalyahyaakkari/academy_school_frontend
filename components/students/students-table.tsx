@@ -99,108 +99,178 @@ export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
         </div>
       )}
 
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/30 hover:bg-muted/30">
-            <TableHead className="w-10">
-              <Checkbox
-                aria-label="Select all"
-                checked={allSelected ? true : someSelected ? "indeterminate" : false}
-                onCheckedChange={toggleAll}
-              />
-            </TableHead>
-            <TableHead>{t("table.student")}</TableHead>
-            <TableHead>{t("table.age")}</TableHead>
-            <TableHead>{t("table.group")}</TableHead>
-            <TableHead>{t("table.parentPhone")}</TableHead>
-            <TableHead>{t("table.status")}</TableHead>
-            <TableHead className="text-end">{t("table.actions")}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {students.map((s) => {
-            const isSelected = selected.has(s.id);
-            return (
-              <TableRow
-                key={s.id}
-                data-state={isSelected ? "selected" : undefined}
-                className={cn(
-                  "group transition-colors",
-                  isSelected && "bg-primary/5 hover:bg-primary/10",
-                )}
-              >
-                <TableCell>
-                  <Checkbox
-                    aria-label={`Select ${s.fullName}`}
-                    checked={isSelected}
-                    onCheckedChange={() => toggleOne(s.id)}
-                  />
-                </TableCell>
-                <TableCell>
-                  <Link
-                    href={`/students/${s.id}`}
-                    className="flex items-center gap-3"
-                  >
-                    <StudentAvatar
-                      name={s.fullName}
-                      size="md"
-                      className="transition-transform group-hover:scale-110"
+      {/* ===== Desktop / tablet: table layout ===== */}
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-muted/30 hover:bg-muted/30">
+              <TableHead className="w-10">
+                <Checkbox
+                  aria-label="Select all"
+                  checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                  onCheckedChange={toggleAll}
+                />
+              </TableHead>
+              <TableHead>{t("table.student")}</TableHead>
+              <TableHead>{t("table.age")}</TableHead>
+              <TableHead>{t("table.group")}</TableHead>
+              <TableHead>{t("table.parentPhone")}</TableHead>
+              <TableHead>{t("table.status")}</TableHead>
+              <TableHead className="text-end">{t("table.actions")}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {students.map((s) => {
+              const isSelected = selected.has(s.id);
+              return (
+                <TableRow
+                  key={s.id}
+                  data-state={isSelected ? "selected" : undefined}
+                  className={cn(
+                    "group transition-colors",
+                    isSelected && "bg-primary/5 hover:bg-primary/10",
+                  )}
+                >
+                  <TableCell>
+                    <Checkbox
+                      aria-label={`Select ${s.fullName}`}
+                      checked={isSelected}
+                      onCheckedChange={() => toggleOne(s.id)}
                     />
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-foreground transition-colors group-hover:text-primary">
-                        {s.fullName}
-                      </p>
-                    </div>
-                  </Link>
-                </TableCell>
-                <TableCell className="text-sm font-medium">
-                  {formatAge(s.dateOfBirth)}
-                </TableCell>
-                <TableCell>
-                  {s.group ? (
+                  </TableCell>
+                  <TableCell>
                     <Link
-                      href={`/groups/${s.group.id}`}
-                      className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+                      href={`/students/${s.id}`}
+                      className="flex items-center gap-3"
                     >
-                      {s.group.name}
+                      <StudentAvatar
+                        name={s.fullName}
+                        size="md"
+                        className="transition-transform group-hover:scale-110"
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-foreground transition-colors group-hover:text-primary">
+                          {s.fullName}
+                        </p>
+                      </div>
                     </Link>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {s.phoneNumber ? (
-                    <span className="inline-flex items-center gap-1.5 text-sm">
-                      <Phone className="size-3 text-muted-foreground" />
-                      {s.phoneNumber}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  {s.isActive ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                      <span className="relative flex size-1.5">
-                        <span className="absolute inset-0 animate-ping-slow rounded-full bg-emerald-500" />
-                        <span className="relative size-1.5 rounded-full bg-emerald-500" />
+                  </TableCell>
+                  <TableCell className="text-sm font-medium">
+                    {formatAge(s.dateOfBirth)}
+                  </TableCell>
+                  <TableCell>
+                    {s.group ? (
+                      <Link
+                        href={`/groups/${s.group.id}`}
+                        className="inline-flex items-center rounded-full border border-primary/20 bg-primary/5 px-2.5 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-primary/10"
+                      >
+                        {s.group.name}
+                      </Link>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {s.phoneNumber ? (
+                      <span className="inline-flex items-center gap-1.5 text-sm">
+                        <Phone className="size-3 text-muted-foreground" />
+                        {s.phoneNumber}
                       </span>
-                      {t("common.active")}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-400/20 bg-slate-500/10 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {s.isActive ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                        <span className="relative flex size-1.5">
+                          <span className="absolute inset-0 animate-ping-slow rounded-full bg-emerald-500" />
+                          <span className="relative size-1.5 rounded-full bg-emerald-500" />
+                        </span>
+                        {t("common.active")}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-400/20 bg-slate-500/10 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">
+                        {t("common.inactive")}
+                      </span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <StudentRowActions studentId={s.id} studentName={s.fullName} />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* ===== Mobile: card layout ===== */}
+      <ul className="divide-y divide-border md:hidden">
+        {students.map((s) => {
+          const isSelected = selected.has(s.id);
+          return (
+            <li
+              key={s.id}
+              className={cn(
+                "flex items-center gap-3 px-3 py-3 transition-colors",
+                isSelected && "bg-primary/5",
+              )}
+            >
+              {/* Selection checkbox, big tap zone */}
+              <button
+                type="button"
+                onClick={() => toggleOne(s.id)}
+                aria-label={`Select ${s.fullName}`}
+                className="grid size-10 shrink-0 place-items-center -m-1.5"
+              >
+                <Checkbox
+                  checked={isSelected}
+                  onCheckedChange={() => toggleOne(s.id)}
+                />
+              </button>
+
+              {/* Tappable card body → student detail */}
+              <Link
+                href={`/students/${s.id}`}
+                className="flex min-w-0 flex-1 items-center gap-3"
+              >
+                <StudentAvatar name={s.fullName} size="md" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-base font-semibold">
+                    {s.fullName}
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <span className="font-medium">{formatAge(s.dateOfBirth)}</span>
+                    {s.group && (
+                      <span className="inline-flex items-center gap-1">
+                        <span className="size-1 rounded-full bg-primary/60" />
+                        {s.group.name}
+                      </span>
+                    )}
+                    {s.phoneNumber && (
+                      <span className="inline-flex items-center gap-1">
+                        <Phone className="size-3" />
+                        {s.phoneNumber}
+                      </span>
+                    )}
+                  </div>
+                  {!s.isActive && (
+                    <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-slate-400/20 bg-slate-500/10 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-400">
                       {t("common.inactive")}
                     </span>
                   )}
-                </TableCell>
-                <TableCell>
-                  <StudentRowActions studentId={s.id} studentName={s.fullName} />
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                </div>
+              </Link>
+
+              {/* Row actions */}
+              <div className="shrink-0">
+                <StudentRowActions studentId={s.id} studentName={s.fullName} />
+              </div>
+            </li>
+          );
+        })}
+      </ul>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>

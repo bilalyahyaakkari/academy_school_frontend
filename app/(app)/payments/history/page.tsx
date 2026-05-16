@@ -34,7 +34,8 @@ export default async function PaymentHistoryPage({ searchParams }: { searchParam
         backLabel="Back to payments"
       />
 
-      <Card>
+      {/* ===== Desktop / tablet: table ===== */}
+      <Card className="hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -86,6 +87,58 @@ export default async function PaymentHistoryPage({ searchParams }: { searchParam
           </TableBody>
         </Table>
       </Card>
+
+      {/* ===== Mobile: card layout ===== */}
+      <div className="md:hidden">
+        {payments.length === 0 ? (
+          <Card className="py-12 text-center text-sm text-muted-foreground">
+            No payments yet.
+          </Card>
+        ) : (
+          <ul className="space-y-2">
+            {payments.map((p) => (
+              <li
+                key={p.id}
+                className="rounded-xl border border-border bg-card p-3 shadow-sm"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <Link
+                      href={`/students/${p.student.id}`}
+                      className="block truncate font-semibold hover:underline"
+                    >
+                      {p.student.fullName}
+                    </Link>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {monthLabel(p.month, p.year)}
+                      {p.paymentDate && ` • ${formatDate(p.paymentDate)}`}
+                    </p>
+                  </div>
+                  <div className="shrink-0">
+                    {p.status === "PAID" ? (
+                      <Badge variant="success">Paid</Badge>
+                    ) : p.status === "PARTIAL" ? (
+                      <Badge variant="warning">Partial</Badge>
+                    ) : (
+                      <Badge variant="secondary">Unpaid</Badge>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-2 flex items-baseline justify-between border-t border-border pt-2 text-sm">
+                  <span className="font-semibold text-foreground">
+                    {formatCurrency(p.paidAmount)}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    / {formatCurrency(p.amount)}
+                    {p.paymentMethod &&
+                      ` • ${p.paymentMethod.toLowerCase().replace("_", " ")}`}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

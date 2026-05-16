@@ -57,96 +57,172 @@ export default async function OutstandingPage() {
         </Card>
       </div>
 
-      <Card>
-        {rows.length === 0 ? (
+      {rows.length === 0 ? (
+        <Card>
           <div className="flex flex-col items-center justify-center gap-2 p-12 text-center">
             <AlertCircle className="size-8 text-muted-foreground" />
             <p className="font-medium">Nothing outstanding</p>
             <p className="text-sm text-muted-foreground">All invoices are paid.</p>
           </div>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Student</TableHead>
-                <TableHead>Group</TableHead>
-                <TableHead className="text-center">Months unpaid</TableHead>
-                <TableHead>Oldest unpaid</TableHead>
-                <TableHead className="text-end">Total owed</TableHead>
-                <TableHead className="text-end">Action</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r) => {
-                const reminderUrl =
-                  r.phoneNumber && settings
-                    ? whatsappReminderUrl({
-                        phoneNumber: r.phoneNumber,
-                        studentName: r.fullName,
-                        amount: r.unpaidAmount,
-                        month: r.oldestUnpaid.month,
-                        year: r.oldestUnpaid.year,
-                        academyName: settings.academyName,
-                        countryCode: settings.whatsappCountry,
-                        template: settings.whatsappTemplate,
-                      })
-                    : null;
-                return (
-                  <TableRow key={r.studentId}>
-                    <TableCell className="font-medium">
+        </Card>
+      ) : (
+        <>
+          {/* ===== Desktop / tablet: table ===== */}
+          <Card className="hidden md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Group</TableHead>
+                  <TableHead className="text-center">Months unpaid</TableHead>
+                  <TableHead>Oldest unpaid</TableHead>
+                  <TableHead className="text-end">Total owed</TableHead>
+                  <TableHead className="text-end">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((r) => {
+                  const reminderUrl =
+                    r.phoneNumber && settings
+                      ? whatsappReminderUrl({
+                          phoneNumber: r.phoneNumber,
+                          studentName: r.fullName,
+                          amount: r.unpaidAmount,
+                          month: r.oldestUnpaid.month,
+                          year: r.oldestUnpaid.year,
+                          academyName: settings.academyName,
+                          countryCode: settings.whatsappCountry,
+                          template: settings.whatsappTemplate,
+                        })
+                      : null;
+                  return (
+                    <TableRow key={r.studentId}>
+                      <TableCell className="font-medium">
+                        <Link
+                          href={`/students/${r.studentId}`}
+                          className="hover:underline"
+                        >
+                          {r.fullName}
+                        </Link>
+                        {!r.isActive && (
+                          <Badge variant="secondary" className="ms-2">
+                            Inactive
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {r.group?.name ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge
+                          variant={r.unpaidCount >= 3 ? "destructive" : "warning"}
+                        >
+                          {r.unpaidCount}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {monthLabel(r.oldestUnpaid.month, r.oldestUnpaid.year)}
+                      </TableCell>
+                      <TableCell className="text-end font-semibold">
+                        {formatCurrency(r.unpaidAmount)}
+                      </TableCell>
+                      <TableCell className="text-end">
+                        {reminderUrl ? (
+                          <Button asChild size="sm" variant="outline">
+                            <a
+                              href={reminderUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <MessageCircle className="size-4" />
+                              Remind
+                            </a>
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            no phone
+                          </span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Card>
+
+          {/* ===== Mobile: card layout ===== */}
+          <ul className="space-y-2 md:hidden">
+            {rows.map((r) => {
+              const reminderUrl =
+                r.phoneNumber && settings
+                  ? whatsappReminderUrl({
+                      phoneNumber: r.phoneNumber,
+                      studentName: r.fullName,
+                      amount: r.unpaidAmount,
+                      month: r.oldestUnpaid.month,
+                      year: r.oldestUnpaid.year,
+                      academyName: settings.academyName,
+                      countryCode: settings.whatsappCountry,
+                      template: settings.whatsappTemplate,
+                    })
+                  : null;
+              return (
+                <li
+                  key={r.studentId}
+                  className="rounded-xl border border-border bg-card p-3 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
                       <Link
                         href={`/students/${r.studentId}`}
-                        className="hover:underline"
+                        className="block truncate font-semibold hover:underline"
                       >
                         {r.fullName}
+                        {!r.isActive && (
+                          <Badge variant="secondary" className="ms-2">
+                            Inactive
+                          </Badge>
+                        )}
                       </Link>
-                      {!r.isActive && (
-                        <Badge variant="secondary" className="ms-2">
-                          Inactive
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {r.group?.name ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Badge
-                        variant={r.unpaidCount >= 3 ? "destructive" : "warning"}
-                      >
-                        {r.unpaidCount}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      {monthLabel(r.oldestUnpaid.month, r.oldestUnpaid.year)}
-                    </TableCell>
-                    <TableCell className="text-end font-semibold">
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {r.group?.name ?? "—"} • oldest:{" "}
+                        {monthLabel(r.oldestUnpaid.month, r.oldestUnpaid.year)}
+                      </p>
+                    </div>
+                    <Badge
+                      variant={r.unpaidCount >= 3 ? "destructive" : "warning"}
+                    >
+                      {r.unpaidCount}
+                    </Badge>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-2">
+                    <span className="text-base font-bold text-destructive">
                       {formatCurrency(r.unpaidAmount)}
-                    </TableCell>
-                    <TableCell className="text-end">
-                      {reminderUrl ? (
-                        <Button asChild size="sm" variant="outline">
-                          <a
-                            href={reminderUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <MessageCircle className="size-4" />
-                            Remind
-                          </a>
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          no phone
-                        </span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
+                    </span>
+                    {reminderUrl ? (
+                      <Button asChild size="sm" variant="outline">
+                        <a
+                          href={reminderUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <MessageCircle className="size-4" />
+                          Remind
+                        </a>
+                      </Button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        no phone
+                      </span>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
     </div>
   );
 }
