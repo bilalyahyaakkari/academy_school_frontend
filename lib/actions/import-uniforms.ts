@@ -6,6 +6,7 @@ import { studentsApi } from "@/lib/api/students";
 import { ApiError } from "@/lib/api/client";
 import { parseCsvWithHeaders } from "@/lib/csv";
 import { parseXlsxWithHeaders, looksLikeXlsx } from "@/lib/xlsx";
+import { normalizeArabic } from "@/lib/arabic";
 
 export type ImportUniformsResult =
   | {
@@ -98,10 +99,12 @@ export async function importUniforms(
     };
   }
 
-  // Resolve student full names → IDs (case-insensitive, trimmed).
+  // Resolve student full names → IDs. Match on an Arabic-normalized key so
+  // visually-identical names with different Unicode shapes (alif variants,
+  // taa marbuta vs haa, stray diacritics, etc.) still resolve.
   const allStudents = await studentsApi.list({}).catch(() => []);
   const byName = new Map(
-    allStudents.map((s) => [s.fullName.trim().toLowerCase(), s.id]),
+    allStudents.map((s) => [normalizeArabic(s.fullName), s.id]),
   );
 
   const uniforms: unknown[] = [];
@@ -141,7 +144,7 @@ export async function importUniforms(
       return;
     }
 
-    const studentId = byName.get(studentName.toLowerCase());
+    const studentId = byName.get(normalizeArabic(studentName));
     if (!studentId) {
       localErrors.push({
         row: rowNum,

@@ -217,18 +217,14 @@ export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
                 isSelected && "bg-primary/5",
               )}
             >
-              {/* Selection checkbox, big tap zone */}
-              <button
-                type="button"
-                onClick={() => toggleOne(s.id)}
-                aria-label={`Select ${s.fullName}`}
-                className="grid size-10 shrink-0 place-items-center -m-1.5"
-              >
+              {/* Selection checkbox, padded for a bigger tap target */}
+              <span className="grid size-10 shrink-0 place-items-center -m-1.5">
                 <Checkbox
+                  aria-label={`Select ${s.fullName}`}
                   checked={isSelected}
                   onCheckedChange={() => toggleOne(s.id)}
                 />
-              </button>
+              </span>
 
               {/* Tappable card body → student detail */}
               <Link

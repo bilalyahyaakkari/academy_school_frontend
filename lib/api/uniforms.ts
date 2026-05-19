@@ -20,4 +20,7 @@ export const uniformsApi = {
       failed: number;
       errors: { row: number; studentId: string; error: string }[];
     }>("/uniforms/import", { uniforms }),
+
+  bulkDelete: (ids: string[]) =>
+    api.post<{ deleted: number }>("/uniforms/bulk-delete", { ids }),
 };

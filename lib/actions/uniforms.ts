@@ -62,3 +62,16 @@ export async function deleteUniform(id: string): Promise<ActionResult> {
   revalidatePath("/uniforms");
   return { success: true };
 }
+
+export async function bulkDeleteUniforms(
+  ids: string[],
+): Promise<{ success: true; deleted: number } | { success: false; error: string }> {
+  if (ids.length === 0) return { success: false, error: "No uniforms selected" };
+  try {
+    const res = await uniformsApi.bulkDelete(ids);
+    revalidatePath("/uniforms");
+    return { success: true, deleted: res.deleted };
+  } catch (err) {
+    return { success: false, error: errMsg(err, "Failed to delete uniforms") };
+  }
+}

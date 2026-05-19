@@ -6,6 +6,7 @@ import { groupsApi } from "@/lib/api/groups";
 import { ApiError } from "@/lib/api/client";
 import { parseCsvWithHeaders } from "@/lib/csv";
 import { parseXlsxWithHeaders, looksLikeXlsx } from "@/lib/xlsx";
+import { normalizeArabic } from "@/lib/arabic";
 
 export type ImportResult =
   | {
@@ -118,7 +119,7 @@ export async function importStudents(formData: FormData): Promise<ImportResult> 
 
   // Resolve group names → group IDs.
   const groups = await groupsApi.list().catch(() => []);
-  const byName = new Map(groups.map((g) => [g.name.trim().toLowerCase(), g.id]));
+  const byName = new Map(groups.map((g) => [normalizeArabic(g.name), g.id]));
 
   const students: unknown[] = [];
   const localErrors: { row: number; fullName: string; error: string }[] = [];
@@ -155,7 +156,7 @@ export async function importStudents(formData: FormData): Promise<ImportResult> 
     const groupNameRaw = (findCol(row, "group") ?? "").trim();
     let groupId: string | null = null;
     if (groupNameRaw) {
-      const id = byName.get(groupNameRaw.toLowerCase());
+      const id = byName.get(normalizeArabic(groupNameRaw));
       if (!id) {
         localErrors.push({
           row: rowNum,

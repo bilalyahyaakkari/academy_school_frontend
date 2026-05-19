@@ -100,12 +100,33 @@ export function UniformDialog(props: Props) {
       toast.error(t("uniformDialog.validation.pickStudent"));
       return;
     }
-    if (!size.trim()) {
+
+    // If user typed a new size but never clicked the ✓ confirm button, use
+    // whatever they typed instead of falling back to the stale `size` state.
+    let effectiveSize = size;
+    if (addingSize) {
+      const trimmed = newSize.trim();
+      if (!trimmed) {
+        toast.error(t("uniformDialog.validation.emptySize"));
+        return;
+      }
+      if (trimmed.length > 20) {
+        toast.error(t("uniformDialog.validation.sizeTooLong"));
+        return;
+      }
+      effectiveSize = trimmed;
+      // Sync the visible state so a subsequent submit (e.g. on error) is consistent.
+      setSize(trimmed);
+      setAddingSize(false);
+      setNewSize("");
+    }
+
+    if (!effectiveSize.trim()) {
       toast.error(t("uniformDialog.validation.emptySize"));
       return;
     }
     formData.set("studentId", studentId);
-    formData.set("size", size.trim());
+    formData.set("size", effectiveSize.trim());
     formData.set("isPaid", isPaid ? "true" : "false");
 
     startTransition(async () => {
@@ -175,12 +196,25 @@ export function UniformDialog(props: Props) {
                         cancelNewSize();
                       }
                     }}
+                    onBlur={(e) => {
+                      // Don't auto-confirm if the blur was caused by clicking
+                      // the ✓ or ✕ button next to the input (they handle it).
+                      const next = e.relatedTarget as HTMLElement | null;
+                      if (next?.closest("[data-size-action]")) return;
+                      const trimmed = newSize.trim();
+                      if (trimmed && trimmed.length <= 20) {
+                        setSize(trimmed);
+                        setAddingSize(false);
+                        setNewSize("");
+                      }
+                    }}
                   />
                   <Button
                     type="button"
                     size="icon"
                     onClick={confirmNewSize}
                     aria-label={t("common.add")}
+                    data-size-action
                   >
                     <Plus className="size-4" />
                   </Button>
@@ -190,6 +224,7 @@ export function UniformDialog(props: Props) {
                     variant="ghost"
                     onClick={cancelNewSize}
                     aria-label={t("common.cancel")}
+                    data-size-action
                   >
                     <X className="size-4" />
                   </Button>
