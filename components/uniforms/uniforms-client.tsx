@@ -25,6 +25,7 @@ import {
 import { UniformDialog } from "./uniform-dialog";
 import {
   toggleUniformPaid,
+  toggleUniformReceived,
   deleteUniform,
   bulkDeleteUniforms,
 } from "@/lib/actions/uniforms";
@@ -40,6 +41,8 @@ import {
   Shirt,
   Upload,
   Users,
+  PackageCheck,
+  Package,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useT } from "@/lib/i18n/client";
@@ -125,6 +128,21 @@ export function UniformsClient({
           u.isPaid
             ? t("uniforms.toast.markedUnpaid")
             : t("uniforms.toast.markedPaid"),
+        );
+    });
+  };
+
+  const onToggleReceived = (u: UniformWithStudent) => {
+    setPendingId(u.id);
+    startTransition(async () => {
+      const res = await toggleUniformReceived(u.id);
+      setPendingId(null);
+      if (res.success === false) toast.error(res.error);
+      else
+        toast.success(
+          u.isReceived
+            ? t("uniforms.toast.markedNotReceived")
+            : t("uniforms.toast.markedReceived"),
         );
     });
   };
@@ -259,6 +277,7 @@ export function UniformsClient({
                   </TableHead>
                   <TableHead>{t("uniforms.table.ordered")}</TableHead>
                   <TableHead>{t("table.status")}</TableHead>
+                  <TableHead>{t("uniforms.table.received")}</TableHead>
                   <TableHead className="text-end">{t("table.actions")}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -303,7 +322,37 @@ export function UniformsClient({
                       )}
                     </TableCell>
                     <TableCell>
+                      {u.isReceived ? (
+                        <Badge variant="success">
+                          <PackageCheck className="size-3" />
+                          {t("uniforms.badge.received")}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">
+                          <Package className="size-3" />
+                          {t("uniforms.badge.notReceived")}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <div className="flex items-center justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant={u.isReceived ? "outline" : "default"}
+                          onClick={() => onToggleReceived(u)}
+                          disabled={pendingId === u.id}
+                        >
+                          {pendingId === u.id ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : u.isReceived ? (
+                            <RotateCcw className="size-4" />
+                          ) : (
+                            <PackageCheck className="size-4" />
+                          )}
+                          {u.isReceived
+                            ? t("uniforms.action.undoReceived")
+                            : t("uniforms.action.markReceived")}
+                        </Button>
                         <Button
                           size="sm"
                           variant={u.isPaid ? "outline" : "default"}
@@ -385,15 +434,43 @@ export function UniformsClient({
                       <span>{formatDate(u.orderedAt)}</span>
                     </div>
                   </div>
-                  <div className="shrink-0">
+                  <div className="flex shrink-0 flex-col items-end gap-1">
                     {u.isPaid ? (
                       <Badge variant="success">{t("common.paid")}</Badge>
                     ) : (
                       <Badge variant="secondary">{t("common.unpaid")}</Badge>
                     )}
+                    {u.isReceived ? (
+                      <Badge variant="success">
+                        <PackageCheck className="size-3" />
+                        {t("uniforms.badge.received")}
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">
+                        <Package className="size-3" />
+                        {t("uniforms.badge.notReceived")}
+                      </Badge>
+                    )}
                   </div>
                 </div>
-                <div className="mt-3 flex items-center justify-end gap-1 border-t border-border pt-2">
+                <div className="mt-3 flex flex-wrap items-center justify-end gap-1 border-t border-border pt-2">
+                  <Button
+                    size="sm"
+                    variant={u.isReceived ? "outline" : "default"}
+                    onClick={() => onToggleReceived(u)}
+                    disabled={pendingId === u.id}
+                  >
+                    {pendingId === u.id ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : u.isReceived ? (
+                      <RotateCcw className="size-4" />
+                    ) : (
+                      <PackageCheck className="size-4" />
+                    )}
+                    {u.isReceived
+                      ? t("uniforms.action.undoReceived")
+                      : t("uniforms.action.markReceived")}
+                  </Button>
                   <Button
                     size="sm"
                     variant={u.isPaid ? "outline" : "default"}

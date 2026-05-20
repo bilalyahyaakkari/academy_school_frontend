@@ -55,6 +55,7 @@ export function UniformDialog(props: Props) {
   const [studentId, setStudentId] = useState(initial?.studentId ?? "");
   const [size, setSize] = useState<string>(initial?.size ?? "M");
   const [isPaid, setIsPaid] = useState(initial?.isPaid ?? false);
+  const [isReceived, setIsReceived] = useState(initial?.isReceived ?? false);
 
   const [addingSize, setAddingSize] = useState(false);
   const [newSize, setNewSize] = useState("");
@@ -128,6 +129,7 @@ export function UniformDialog(props: Props) {
     formData.set("studentId", studentId);
     formData.set("size", effectiveSize.trim());
     formData.set("isPaid", isPaid ? "true" : "false");
+    formData.set("isReceived", isReceived ? "true" : "false");
 
     startTransition(async () => {
       const res =
@@ -275,6 +277,19 @@ export function UniformDialog(props: Props) {
             />
             <Label htmlFor="isPaid" className="cursor-pointer">
               {t("uniformDialog.field.alreadyPaid")}
+            </Label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              id="isReceived"
+              type="checkbox"
+              checked={isReceived}
+              onChange={(e) => setIsReceived(e.target.checked)}
+              className="size-4 rounded border-border"
+            />
+            <Label htmlFor="isReceived" className="cursor-pointer">
+              {t("uniformDialog.field.alreadyReceived")}
             </Label>
           </div>
 

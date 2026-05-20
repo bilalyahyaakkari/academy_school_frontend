@@ -12,6 +12,9 @@ function buildPayload(formData: FormData) {
     size: String(formData.get("size") ?? "M").trim(),
     price: Number(formData.get("price") ?? 0),
     isPaid: formData.get("isPaid") === "on" || formData.get("isPaid") === "true",
+    isReceived:
+      formData.get("isReceived") === "on" ||
+      formData.get("isReceived") === "true",
     notes: formData.get("notes") ? String(formData.get("notes")) : undefined,
   };
 }
@@ -48,6 +51,19 @@ export async function toggleUniformPaid(id: string): Promise<ActionResult> {
     await uniformsApi.togglePaid(id);
   } catch (err) {
     return { success: false, error: errMsg(err, "Failed to toggle paid status") };
+  }
+  revalidatePath("/uniforms");
+  return { success: true };
+}
+
+export async function toggleUniformReceived(id: string): Promise<ActionResult> {
+  try {
+    await uniformsApi.toggleReceived(id);
+  } catch (err) {
+    return {
+      success: false,
+      error: errMsg(err, "Failed to toggle received status"),
+    };
   }
   revalidatePath("/uniforms");
   return { success: true };

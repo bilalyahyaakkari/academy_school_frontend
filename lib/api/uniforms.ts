@@ -12,6 +12,8 @@ export const uniformsApi = {
   create: (body: unknown) => api.post<Uniform>("/uniforms", body),
   update: (id: string, body: unknown) => api.put<Uniform>(`/uniforms/${id}`, body),
   togglePaid: (id: string) => api.patch<Uniform>(`/uniforms/${id}/toggle-paid`),
+  toggleReceived: (id: string) =>
+    api.patch<Uniform>(`/uniforms/${id}/toggle-received`),
   remove: (id: string) => api.delete<{ success: true }>(`/uniforms/${id}`),
 
   importMany: (uniforms: unknown[]) =>
