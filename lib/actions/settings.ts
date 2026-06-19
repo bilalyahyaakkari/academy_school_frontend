@@ -36,6 +36,10 @@ export async function updateSettings(formData: FormData): Promise<ActionResult> 
   }
   revalidatePath("/settings");
   revalidatePath("/", "layout");
+  // defaultFee may have changed → unpaid invoices (for students with no
+  // override and no group) were updated server-side.
+  revalidatePath("/payments");
+  revalidatePath("/payments/outstanding");
   return { success: true };
 }
 

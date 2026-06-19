@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, X } from "lucide-react";
+import { Search, X, Archive } from "lucide-react";
 import { useT } from "@/lib/i18n/client";
 
 type Group = { id: string; name: string };
@@ -21,11 +21,13 @@ export function StudentsFilterBar({
   initialQ,
   initialGroupId,
   initialStatus,
+  initialArchived,
 }: {
   groups: Group[];
   initialQ?: string;
   initialGroupId?: string;
   initialStatus?: string;
+  initialArchived?: "only" | "include";
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -47,7 +49,7 @@ export function StudentsFilterBar({
     update({ q: q || undefined });
   };
 
-  const hasFilters = !!(initialQ || initialGroupId || initialStatus);
+  const hasFilters = !!(initialQ || initialGroupId || initialStatus || initialArchived);
 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
@@ -93,6 +95,30 @@ export function StudentsFilterBar({
           <SelectItem value="active">{t("students.filter.active")}</SelectItem>
           <SelectItem value="inactive">
             {t("students.filter.inactive")}
+          </SelectItem>
+        </SelectContent>
+      </Select>
+      <Select
+        value={initialArchived ?? "__all__"}
+        onValueChange={(v) => update({ archived: v })}
+      >
+        <SelectTrigger className="sm:w-44">
+          <SelectValue placeholder={t("students.filter.archive.activeOnly")} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__all__">
+            <span className="inline-flex items-center gap-2">
+              {t("students.filter.archive.activeOnly")}
+            </span>
+          </SelectItem>
+          <SelectItem value="include">
+            {t("students.filter.archive.all")}
+          </SelectItem>
+          <SelectItem value="only">
+            <span className="inline-flex items-center gap-2">
+              <Archive className="size-3.5" />
+              {t("students.filter.archive.onlyArchived")}
+            </span>
           </SelectItem>
         </SelectContent>
       </Select>

@@ -19,8 +19,15 @@ export async function GET(request: NextRequest) {
   const groupParam = sp.get("groupId") === "__none__" ? "none" : sp.get("groupId") || undefined;
   const status = (sp.get("status") as "active" | "inactive" | null) || undefined;
   const q = sp.get("q") || undefined;
+  const archived =
+    (sp.get("archived") as "only" | "include" | null) || undefined;
 
-  const students = await studentsApi.list({ q, groupId: groupParam, status });
+  const students = await studentsApi.list({
+    q,
+    groupId: groupParam,
+    status,
+    archived,
+  });
   const currentYear = new Date().getFullYear();
 
   const rows = students.map((s) => {

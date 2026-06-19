@@ -27,7 +27,7 @@ import { bulkDeleteStudents } from "@/lib/actions/students";
 import { formatAge, cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n/client";
 import { toast } from "sonner";
-import { Trash2, Loader2, Phone } from "lucide-react";
+import { Trash2, Loader2, Phone, Archive } from "lucide-react";
 import type { StudentWithGroup } from "@/lib/api/types";
 
 export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
@@ -181,7 +181,12 @@ export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
                     )}
                   </TableCell>
                   <TableCell>
-                    {s.isActive ? (
+                    {s.archived ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+                        <Archive className="size-3" />
+                        {t("students.archive.badge")}
+                      </span>
+                    ) : s.isActive ? (
                       <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                         <span className="relative flex size-1.5">
                           <span className="absolute inset-0 animate-ping-slow rounded-full bg-emerald-500" />
@@ -196,7 +201,7 @@ export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
                     )}
                   </TableCell>
                   <TableCell>
-                    <StudentRowActions studentId={s.id} studentName={s.fullName} />
+                    <StudentRowActions studentId={s.id} studentName={s.fullName} archived={s.archived} />
                   </TableCell>
                 </TableRow>
               );
@@ -251,17 +256,22 @@ export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
                       </span>
                     )}
                   </div>
-                  {!s.isActive && (
+                  {s.archived ? (
+                    <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                      <Archive className="size-2.5" />
+                      {t("students.archive.badge")}
+                    </span>
+                  ) : !s.isActive ? (
                     <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-slate-400/20 bg-slate-500/10 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-400">
                       {t("common.inactive")}
                     </span>
-                  )}
+                  ) : null}
                 </div>
               </Link>
 
               {/* Row actions */}
               <div className="shrink-0">
-                <StudentRowActions studentId={s.id} studentName={s.fullName} />
+                <StudentRowActions studentId={s.id} studentName={s.fullName} archived={s.archived} />
               </div>
             </li>
           );

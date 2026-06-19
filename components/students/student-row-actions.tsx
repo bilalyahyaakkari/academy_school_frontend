@@ -12,19 +12,34 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { deleteStudent } from "@/lib/actions/students";
+import {
+  deleteStudent,
+  archiveStudent,
+  unarchiveStudent,
+} from "@/lib/actions/students";
 import { toast } from "sonner";
-import { Pencil, Trash2, Loader2 } from "lucide-react";
+import { useT } from "@/lib/i18n/client";
+import {
+  Pencil,
+  Trash2,
+  Loader2,
+  Archive,
+  ArchiveRestore,
+} from "lucide-react";
 
 export function StudentRowActions({
   studentId,
   studentName,
+  archived = false,
 }: {
   studentId: string;
   studentName: string;
+  archived?: boolean;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  const [archivePending, startArchiveTransition] = useTransition();
 
   const onDelete = () => {
     startTransition(async () => {
@@ -34,7 +49,23 @@ export function StudentRowActions({
         return;
       }
       toast.success(`Deleted ${studentName}`);
-      // The action redirects to /students and revalidates the list.
+    });
+  };
+
+  const onArchive = () => {
+    startArchiveTransition(async () => {
+      const res = archived
+        ? await unarchiveStudent(studentId)
+        : await archiveStudent(studentId);
+      if (res && res.success === false) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(
+        archived
+          ? t("students.archive.restored", { name: studentName })
+          : t("students.archive.archived", { name: studentName }),
+      );
     });
   };
 
@@ -44,6 +75,36 @@ export function StudentRowActions({
         <Link href={`/students/${studentId}/edit`} aria-label={`Edit ${studentName}`}>
           <Pencil className="size-4" />
         </Link>
+      </Button>
+
+      <Button
+        size="icon"
+        variant="ghost"
+        onClick={onArchive}
+        disabled={archivePending}
+        aria-label={
+          archived
+            ? t("students.archive.action.restore")
+            : t("students.archive.action.archive")
+        }
+        title={
+          archived
+            ? t("students.archive.action.restore")
+            : t("students.archive.action.archive")
+        }
+        className={
+          archived
+            ? "text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400"
+            : "text-amber-600 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-400"
+        }
+      >
+        {archivePending ? (
+          <Loader2 className="size-4 animate-spin" />
+        ) : archived ? (
+          <ArchiveRestore className="size-4" />
+        ) : (
+          <Archive className="size-4" />
+        )}
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>

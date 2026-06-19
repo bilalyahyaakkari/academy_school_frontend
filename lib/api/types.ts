@@ -60,6 +60,8 @@ export type Student = {
   phoneNumber: string | null;
   groupId: string | null;
   isActive: boolean;
+  archived: boolean;
+  archivedAt: string | null;
   /** Per-student override of the group's monthly fee. Null = inherit. */
   monthlyFee: number | null;
   notes: string | null;

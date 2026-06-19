@@ -55,6 +55,9 @@ export async function updateStudent(id: string, formData: FormData): Promise<Act
   revalidatePath("/students");
   revalidatePath(`/students/${id}`);
   revalidatePath("/dashboard");
+  // Effective fee may have changed → unpaid invoices were updated server-side.
+  revalidatePath("/payments");
+  revalidatePath("/payments/outstanding");
   redirect(`/students/${id}`);
 }
 
@@ -76,6 +79,32 @@ export async function toggleStudentActive(id: string): Promise<ActionResult> {
     return { success: false, error: errorMessage(err, "Failed to toggle status") };
   }
   revalidatePath("/students");
+  revalidatePath(`/students/${id}`);
+  return { success: true };
+}
+
+export async function archiveStudent(id: string): Promise<ActionResult> {
+  try {
+    await studentsApi.archive(id);
+  } catch (err) {
+    return { success: false, error: errorMessage(err, "Failed to archive student") };
+  }
+  revalidatePath("/students");
+  revalidatePath("/payments");
+  revalidatePath("/uniforms");
+  revalidatePath(`/students/${id}`);
+  return { success: true };
+}
+
+export async function unarchiveStudent(id: string): Promise<ActionResult> {
+  try {
+    await studentsApi.unarchive(id);
+  } catch (err) {
+    return { success: false, error: errorMessage(err, "Failed to restore student") };
+  }
+  revalidatePath("/students");
+  revalidatePath("/payments");
+  revalidatePath("/uniforms");
   revalidatePath(`/students/${id}`);
   return { success: true };
 }

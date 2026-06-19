@@ -25,6 +25,7 @@ type SearchParams = Promise<{
   q?: string;
   groupId?: string;
   status?: string;
+  archived?: "only" | "include";
 }>;
 
 type Tone = "blue" | "green" | "slate";
@@ -61,14 +62,20 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
   const q = sp.q?.trim() ?? "";
   const groupParam = sp.groupId === "__none__" ? "none" : sp.groupId || undefined;
   const status = sp.status as "active" | "inactive" | undefined;
+  const archivedParam = sp.archived; // undefined = exclude archived (default)
 
   const t = await getT();
 
   // 2 parallel fetches:
   //   - filtered list for the table (matches what the user is filtering for)
-  //   - unfiltered list to compute the academy-wide stats banner
+  //   - unfiltered list (non-archived) to compute the academy-wide stats banner
   const [students, allStudents, groups] = await Promise.all([
-    studentsApi.list({ q: q || undefined, groupId: groupParam, status }),
+    studentsApi.list({
+      q: q || undefined,
+      groupId: groupParam,
+      status,
+      archived: archivedParam,
+    }),
     studentsApi.list({}),
     groupsApi.list(),
   ]);
@@ -76,12 +83,13 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
   const total = allStudents.length;
   const active = allStudents.filter((s) => s.isActive).length;
   const inactive = total - active;
-  const isFiltered = !!(q || sp.groupId || status);
+  const isFiltered = !!(q || sp.groupId || status || archivedParam);
 
   const exportParams = new URLSearchParams();
   if (q) exportParams.set("q", q);
   if (sp.groupId) exportParams.set("groupId", sp.groupId);
   if (status) exportParams.set("status", status);
+  if (archivedParam) exportParams.set("archived", archivedParam);
   const exportHref = `/api/students/export${
     exportParams.toString() ? `?${exportParams.toString()}` : ""
   }`;
@@ -157,6 +165,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
         initialQ={q}
         initialGroupId={sp.groupId}
         initialStatus={status}
+        initialArchived={archivedParam}
       />
 
       {students.length === 0 ? (

@@ -59,6 +59,10 @@ export async function updateGroup(id: string, formData: FormData): Promise<Actio
   }
   revalidatePath("/groups");
   revalidatePath(`/groups/${id}`);
+  // Group fee may have changed → unpaid invoices for members were updated server-side.
+  revalidatePath("/payments");
+  revalidatePath("/payments/outstanding");
+  revalidatePath("/dashboard");
   redirect(`/groups/${id}`);
 }
 
