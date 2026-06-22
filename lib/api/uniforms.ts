@@ -14,6 +14,8 @@ export const uniformsApi = {
   togglePaid: (id: string) => api.patch<Uniform>(`/uniforms/${id}/toggle-paid`),
   toggleReceived: (id: string) =>
     api.patch<Uniform>(`/uniforms/${id}/toggle-received`),
+  addPayment: (id: string, body: { amount: number }) =>
+    api.post<Uniform>(`/uniforms/${id}/add-payment`, body),
   remove: (id: string) => api.delete<{ success: true }>(`/uniforms/${id}`),
 
   importMany: (uniforms: unknown[]) =>

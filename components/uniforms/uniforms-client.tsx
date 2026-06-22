@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { UniformDialog } from "./uniform-dialog";
+import { UniformAddPaymentDialog } from "./uniform-add-payment-dialog";
 import {
   toggleUniformPaid,
   toggleUniformReceived,
@@ -47,6 +48,7 @@ import {
   Package,
   Search,
   X,
+  Wallet,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useT } from "@/lib/i18n/client";
@@ -65,6 +67,7 @@ export function UniformsClient({
   const [filter, setFilter] = useState<"all" | "paid" | "unpaid">("all");
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<UniformWithStudent | null>(null);
+  const [recording, setRecording] = useState<UniformWithStudent | null>(null);
   const [creating, setCreating] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -343,7 +346,18 @@ export function UniformsClient({
                       <Badge variant="outline">{u.size}</Badge>
                     </TableCell>
                     <TableCell className="text-end">
-                      {formatCurrency(u.price)}
+                      <div className="flex flex-col items-end leading-tight">
+                        <span className="font-medium">
+                          {formatCurrency(u.price)}
+                        </span>
+                        {!u.isPaid && u.paidAmount > 0 && (
+                          <span className="text-[10px] text-muted-foreground">
+                            {t("uniforms.row.paidOf", {
+                              paid: formatCurrency(u.paidAmount),
+                            })}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {formatDate(u.orderedAt)}
@@ -351,6 +365,8 @@ export function UniformsClient({
                     <TableCell>
                       {u.isPaid ? (
                         <Badge variant="success">{t("common.paid")}</Badge>
+                      ) : u.paidAmount > 0 ? (
+                        <Badge variant="warning">{t("common.partial")}</Badge>
                       ) : (
                         <Badge variant="secondary">{t("common.unpaid")}</Badge>
                       )}
@@ -387,23 +403,30 @@ export function UniformsClient({
                             ? t("uniforms.action.undoReceived")
                             : t("uniforms.action.markReceived")}
                         </Button>
-                        <Button
-                          size="sm"
-                          variant={u.isPaid ? "outline" : "default"}
-                          onClick={() => onTogglePaid(u)}
-                          disabled={pendingId === u.id}
-                        >
-                          {pendingId === u.id ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : u.isPaid ? (
-                            <RotateCcw className="size-4" />
-                          ) : (
-                            <Check className="size-4" />
-                          )}
-                          {u.isPaid
-                            ? t("uniforms.action.undo")
-                            : t("uniforms.action.markPaid")}
-                        </Button>
+                        {u.isPaid ? (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onTogglePaid(u)}
+                            disabled={pendingId === u.id}
+                          >
+                            {pendingId === u.id ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <RotateCcw className="size-4" />
+                            )}
+                            {t("uniforms.action.undo")}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={() => setRecording(u)}
+                            disabled={pendingId === u.id}
+                          >
+                            <Wallet className="size-4" />
+                            {t("uniforms.action.recordPayment")}
+                          </Button>
+                        )}
                         <Button
                           size="icon"
                           variant="ghost"
@@ -465,12 +488,21 @@ export function UniformsClient({
                       <span className="font-semibold text-foreground">
                         {formatCurrency(u.price)}
                       </span>
+                      {!u.isPaid && u.paidAmount > 0 && (
+                        <span className="text-warning">
+                          {t("uniforms.row.paidOf", {
+                            paid: formatCurrency(u.paidAmount),
+                          })}
+                        </span>
+                      )}
                       <span>{formatDate(u.orderedAt)}</span>
                     </div>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     {u.isPaid ? (
                       <Badge variant="success">{t("common.paid")}</Badge>
+                    ) : u.paidAmount > 0 ? (
+                      <Badge variant="warning">{t("common.partial")}</Badge>
                     ) : (
                       <Badge variant="secondary">{t("common.unpaid")}</Badge>
                     )}
@@ -505,23 +537,30 @@ export function UniformsClient({
                       ? t("uniforms.action.undoReceived")
                       : t("uniforms.action.markReceived")}
                   </Button>
-                  <Button
-                    size="sm"
-                    variant={u.isPaid ? "outline" : "default"}
-                    onClick={() => onTogglePaid(u)}
-                    disabled={pendingId === u.id}
-                  >
-                    {pendingId === u.id ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : u.isPaid ? (
-                      <RotateCcw className="size-4" />
-                    ) : (
-                      <Check className="size-4" />
-                    )}
-                    {u.isPaid
-                      ? t("uniforms.action.undo")
-                      : t("uniforms.action.markPaid")}
-                  </Button>
+                  {u.isPaid ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onTogglePaid(u)}
+                      disabled={pendingId === u.id}
+                    >
+                      {pendingId === u.id ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <RotateCcw className="size-4" />
+                      )}
+                      {t("uniforms.action.undo")}
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => setRecording(u)}
+                      disabled={pendingId === u.id}
+                    >
+                      <Wallet className="size-4" />
+                      {t("uniforms.action.recordPayment")}
+                    </Button>
+                  )}
                   <Button
                     size="icon"
                     variant="ghost"
@@ -563,6 +602,15 @@ export function UniformsClient({
           onClose={() => setEditing(null)}
           mode="edit"
           uniform={editing}
+        />
+      )}
+      {recording && (
+        <UniformAddPaymentDialog
+          uniformId={recording.id}
+          studentName={recording.student.fullName}
+          total={recording.price}
+          alreadyPaid={recording.paidAmount}
+          onClose={() => setRecording(null)}
         />
       )}
 

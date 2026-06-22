@@ -7,11 +7,18 @@ import { ApiError } from "@/lib/api/client";
 type ActionResult = { success: true } | { success: false; error: string };
 
 function buildPayload(formData: FormData) {
+  const paidAmountRaw = formData.get("paidAmount");
+  const paidAmount =
+    paidAmountRaw == null || String(paidAmountRaw).trim() === ""
+      ? undefined
+      : Number(paidAmountRaw);
+
   return {
     studentId: String(formData.get("studentId") ?? ""),
     size: String(formData.get("size") ?? "M").trim(),
     price: Number(formData.get("price") ?? 0),
     isPaid: formData.get("isPaid") === "on" || formData.get("isPaid") === "true",
+    paidAmount,
     isReceived:
       formData.get("isReceived") === "on" ||
       formData.get("isReceived") === "true",
@@ -51,6 +58,23 @@ export async function toggleUniformPaid(id: string): Promise<ActionResult> {
     await uniformsApi.togglePaid(id);
   } catch (err) {
     return { success: false, error: errMsg(err, "Failed to toggle paid status") };
+  }
+  revalidatePath("/uniforms");
+  return { success: true };
+}
+
+export async function addUniformPayment(
+  id: string,
+  formData: FormData,
+): Promise<ActionResult> {
+  const amount = Number(formData.get("amount") ?? 0);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { success: false, error: "Enter a positive amount" };
+  }
+  try {
+    await uniformsApi.addPayment(id, { amount });
+  } catch (err) {
+    return { success: false, error: errMsg(err, "Failed to record payment") };
   }
   revalidatePath("/uniforms");
   return { success: true };

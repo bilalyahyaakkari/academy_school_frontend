@@ -59,12 +59,16 @@ export default async function UniformsPage() {
     studentsApi.list({}),
   ]);
 
-  const totalRevenue = uniforms
-    .filter((u) => u.isPaid)
-    .reduce((sum, u) => sum + u.price, 0);
-  const totalOutstanding = uniforms
-    .filter((u) => !u.isPaid)
-    .reduce((sum, u) => sum + u.price, 0);
+  // Money totals now respect partial payments: revenue = sum of paidAmount
+  // (capped at price); outstanding = sum of (price - paidAmount) for unpaid + partial.
+  const totalRevenue = uniforms.reduce(
+    (sum, u) => sum + Math.min(u.paidAmount, u.price),
+    0,
+  );
+  const totalOutstanding = uniforms.reduce(
+    (sum, u) => sum + Math.max(0, u.price - u.paidAmount),
+    0,
+  );
   const paidCount = uniforms.filter((u) => u.isPaid).length;
   const unpaidCount = uniforms.filter((u) => !u.isPaid).length;
   const receivedCount = uniforms.filter((u) => u.isReceived).length;

@@ -125,6 +125,7 @@ export type Uniform = {
   price: number;
   isPaid: boolean;
   paidAt: string | null;
+  paidAmount: number;
   isReceived: boolean;
   receivedAt: string | null;
   orderedAt: string;
