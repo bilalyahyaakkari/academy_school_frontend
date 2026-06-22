@@ -6,6 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { normalizeArabic } from "@/lib/arabic";
 import {
   Table,
   TableBody,
@@ -43,6 +45,8 @@ import {
   Users,
   PackageCheck,
   Package,
+  Search,
+  X,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useT } from "@/lib/i18n/client";
@@ -59,6 +63,7 @@ export function UniformsClient({
 }) {
   const t = useT();
   const [filter, setFilter] = useState<"all" | "paid" | "unpaid">("all");
+  const [q, setQ] = useState("");
   const [editing, setEditing] = useState<UniformWithStudent | null>(null);
   const [creating, setCreating] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -67,9 +72,17 @@ export function UniformsClient({
   const [bulkPending, startBulkTransition] = useTransition();
   const [, startTransition] = useTransition();
 
-  const filtered = uniforms.filter((u) =>
-    filter === "all" ? true : filter === "paid" ? u.isPaid : !u.isPaid,
-  );
+  // Arabic-normalized substring search across student name + size + notes.
+  const normalizedQ = normalizeArabic(q.trim());
+  const filtered = uniforms.filter((u) => {
+    if (filter === "paid" && !u.isPaid) return false;
+    if (filter === "unpaid" && u.isPaid) return false;
+    if (!normalizedQ) return true;
+    const haystack = normalizeArabic(
+      `${u.student.fullName} ${u.size} ${u.notes ?? ""}`,
+    );
+    return haystack.includes(normalizedQ);
+  });
 
   const allFilteredSelected =
     filtered.length > 0 && filtered.every((u) => selected.has(u.id));
@@ -160,6 +173,27 @@ export function UniformsClient({
 
   return (
     <>
+      <div className="relative">
+        <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          type="search"
+          placeholder={t("uniforms.search.placeholder")}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          className="ps-9 pe-9"
+        />
+        {q && (
+          <button
+            type="button"
+            onClick={() => setQ("")}
+            aria-label={t("common.clear")}
+            className="absolute end-2 top-1/2 grid size-7 -translate-y-1/2 place-items-center rounded text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <X className="size-4" />
+          </button>
+        )}
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-1 rounded-md border border-border bg-muted/30 p-1 text-sm">
           {(["all", "unpaid", "paid"] as const).map((f) => (

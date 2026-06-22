@@ -11,6 +11,7 @@ import {
   Clock,
   AlertCircle,
   Shirt,
+  PackageCheck,
 } from "lucide-react";
 
 export const metadata = { title: "Uniforms — Academy" };
@@ -66,16 +67,22 @@ export default async function UniformsPage() {
     .reduce((sum, u) => sum + u.price, 0);
   const paidCount = uniforms.filter((u) => u.isPaid).length;
   const unpaidCount = uniforms.filter((u) => !u.isPaid).length;
+  const receivedCount = uniforms.filter((u) => u.isReceived).length;
+  const pendingReceiveCount = uniforms.length - receivedCount;
 
   // Tally per size. Canonical sizes (S/M/L/XL) come first in the listed order,
   // any custom sizes follow alphabetically.
   const CANONICAL = ["S", "M", "L", "XL"];
-  const sizeTotals = new Map<string, { total: number; paid: number }>();
+  const sizeTotals = new Map<
+    string,
+    { total: number; paid: number; received: number }
+  >();
   for (const u of uniforms) {
     const key = u.size?.trim() || "—";
-    const cur = sizeTotals.get(key) ?? { total: 0, paid: 0 };
+    const cur = sizeTotals.get(key) ?? { total: 0, paid: 0, received: 0 };
     cur.total += 1;
     if (u.isPaid) cur.paid += 1;
+    if (u.isReceived) cur.received += 1;
     sizeTotals.set(key, cur);
   }
   const sizeBreakdown = Array.from(sizeTotals.entries())
@@ -95,11 +102,22 @@ export default async function UniformsPage() {
         description={t("uniforms.desc")}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <Stat
           label={t("uniforms.stat.orders")}
           value={String(uniforms.length)}
           icon={<ShoppingBag className="size-5" />}
+          tone="blue"
+        />
+        <Stat
+          label={t("uniforms.stat.received")}
+          value={String(receivedCount)}
+          sub={
+            pendingReceiveCount > 0
+              ? t("uniforms.stat.received.sub", { pending: pendingReceiveCount })
+              : t("uniforms.stat.received.allDelivered")
+          }
+          icon={<PackageCheck className="size-5" />}
           tone="blue"
         />
         <Stat
@@ -149,23 +167,61 @@ export default async function UniformsPage() {
                 </p>
               </div>
             </div>
-            <div className="flex flex-wrap gap-2">
-              {sizeBreakdown.map(([size, { total, paid }]) => (
-                <div
-                  key={size}
-                  className="group/chip flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
-                >
-                  <span className="inline-flex min-w-8 items-center justify-center rounded-md bg-gradient-to-br from-indigo-500 to-blue-600 px-2 py-0.5 text-xs font-bold text-white shadow-sm">
-                    {size}
-                  </span>
-                  <span className="text-lg font-bold tracking-tight">
-                    {total}
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">
-                    {t("uniforms.bySize.paidOf", { paid, total })}
-                  </span>
-                </div>
-              ))}
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {sizeBreakdown.map(([size, { total, paid, received }]) => {
+                const pendingReceive = total - received;
+                const pendingPay = total - paid;
+                return (
+                  <div
+                    key={size}
+                    className="group/chip flex items-center gap-3 rounded-xl border border-border bg-card p-3 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md"
+                  >
+                    <span className="inline-flex size-12 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 text-base font-bold text-white shadow-sm">
+                      {size}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-2xl font-bold leading-none tracking-tight">
+                        {total}
+                      </p>
+                      <p className="mt-0.5 text-[10px] uppercase tracking-widest text-muted-foreground">
+                        {t("uniforms.bySize.total")}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 text-[11px]">
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium",
+                          pendingReceive === 0
+                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                            : "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+                        )}
+                        title={t("uniforms.bySize.receivedTooltip", {
+                          received,
+                          pending: pendingReceive,
+                        })}
+                      >
+                        <PackageCheck className="size-3" />
+                        {received}/{total}
+                      </span>
+                      <span
+                        className={cn(
+                          "inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium",
+                          pendingPay === 0
+                            ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                            : "bg-rose-500/10 text-rose-700 dark:text-rose-400",
+                        )}
+                        title={t("uniforms.bySize.paidTooltip", {
+                          paid,
+                          pending: pendingPay,
+                        })}
+                      >
+                        <CheckCircle2 className="size-3" />
+                        {paid}/{total}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
