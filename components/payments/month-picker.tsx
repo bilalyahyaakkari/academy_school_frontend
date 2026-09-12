@@ -28,7 +28,19 @@ const ARABIC_MONTHS_LEVANTINE = [
   "كانون الأول",
 ];
 
-export function MonthPicker({ year, month }: { year: number; month: number }) {
+/**
+ * Month/year stepper. Shared by every month-scoped screen — pass `basePath` to
+ * point it at that screen's route.
+ */
+export function MonthPicker({
+  year,
+  month,
+  basePath = "/payments",
+}: {
+  year: number;
+  month: number;
+  basePath?: string;
+}) {
   const router = useRouter();
   const now = new Date();
   const years = Array.from({ length: 6 }, (_, i) => now.getFullYear() - 3 + i);
@@ -37,7 +49,7 @@ export function MonthPicker({ year, month }: { year: number; month: number }) {
   const monthLabels = locale === "ar" ? ARABIC_MONTHS_LEVANTINE : MONTH_NAMES;
 
   const go = (y: number, m: number) => {
-    router.push(`/payments?year=${y}&month=${m}`);
+    router.push(`${basePath}?year=${y}&month=${m}`);
   };
 
   const prev = () => {

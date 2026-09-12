@@ -21,6 +21,8 @@ export const paymentsApi = {
         fullName: string;
         phoneNumber: string | null;
         isActive: boolean;
+        /** True when the student has left the academy — the debt still stands. */
+        archived: boolean;
         group: { id: string; name: string } | null;
         unpaidAmount: number;
         unpaidCount: number;

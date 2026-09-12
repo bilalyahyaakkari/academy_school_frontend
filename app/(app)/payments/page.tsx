@@ -11,6 +11,7 @@ import { getT, getLocale } from "@/lib/i18n/server";
 import { monthLabelI18n } from "@/lib/i18n";
 import {
   AlertCircle,
+  CalendarRange,
   CircleDollarSign,
   CheckCircle2,
   TrendingDown,
@@ -85,6 +86,12 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Sea
         actions={
           <>
             <Button asChild variant="outline">
+              <Link href={`/roster?year=${year}&month=${month}`}>
+                <CalendarRange className="size-4" />
+                {t("nav.roster")}
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
               <Link href="/payments/outstanding">
                 <AlertCircle className="size-4" />
                 {t("payments.action.outstanding")}
@@ -146,6 +153,7 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Sea
           studentName: s.fullName,
           phoneNumber: s.phoneNumber,
           groupName: s.group?.name ?? null,
+          onRoster: s.onRoster,
           payment: s.payments[0]
             ? {
                 id: s.payments[0].id,

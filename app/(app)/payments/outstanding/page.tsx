@@ -14,11 +14,13 @@ import {
 } from "@/components/ui/table";
 import { PageHeader } from "@/components/app/page-header";
 import { formatCurrency, monthLabel, whatsappReminderUrl } from "@/lib/utils";
+import { getT } from "@/lib/i18n/server";
 import { MessageCircle, AlertCircle } from "lucide-react";
 
 export const metadata = { title: "Outstanding payments — Academy" };
 
 export default async function OutstandingPage() {
+  const t = await getT();
   const [rows, settings] = await Promise.all([
     paymentsApi.outstanding(),
     settingsApi.get().catch(() => null),
@@ -104,10 +106,19 @@ export default async function OutstandingPage() {
                         >
                           {r.fullName}
                         </Link>
-                        {!r.isActive && (
-                          <Badge variant="secondary" className="ms-2">
-                            Inactive
+                        {r.archived ? (
+                          <Badge
+                            variant="outline"
+                            className="ms-2 border-amber-500/40 text-amber-600 dark:text-amber-400"
+                          >
+                            {t("roster.badge.left")}
                           </Badge>
+                        ) : (
+                          !r.isActive && (
+                            <Badge variant="secondary" className="ms-2">
+                              {t("common.inactive")}
+                            </Badge>
+                          )
                         )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
@@ -179,10 +190,19 @@ export default async function OutstandingPage() {
                         className="block truncate font-semibold hover:underline"
                       >
                         {r.fullName}
-                        {!r.isActive && (
-                          <Badge variant="secondary" className="ms-2">
-                            Inactive
+                        {r.archived ? (
+                          <Badge
+                            variant="outline"
+                            className="ms-2 border-amber-500/40 text-amber-600 dark:text-amber-400"
+                          >
+                            {t("roster.badge.left")}
                           </Badge>
+                        ) : (
+                          !r.isActive && (
+                            <Badge variant="secondary" className="ms-2">
+                              {t("common.inactive")}
+                            </Badge>
+                          )
                         )}
                       </Link>
                       <p className="mt-0.5 text-xs text-muted-foreground">

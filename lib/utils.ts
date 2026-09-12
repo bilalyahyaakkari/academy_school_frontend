@@ -57,6 +57,37 @@ export function formatDate(input: Date | string | null | undefined): string {
   return asDate(input).toLocaleDateString();
 }
 
+/**
+ * Formats a date-only value (stored at UTC midnight) without letting the local
+ * timezone shift it a day — "2026-09-12" must render as the 12th everywhere.
+ */
+export function formatDateOnly(input: string | Date | null | undefined): string {
+  if (!input) return "—";
+  const iso = typeof input === "string" ? input : input.toISOString();
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString();
+}
+
+/** Day of the month for a date-only value, as displayed (no TZ shift). */
+export function dayOfMonth(input: string | Date): number {
+  const iso = typeof input === "string" ? input : input.toISOString();
+  return Number(iso.slice(8, 10));
+}
+
+/** Short weekday label ("Mon") for a date-only value. */
+export function weekdayShort(input: string | Date, locale?: string): string {
+  const iso = typeof input === "string" ? input : input.toISOString();
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(locale, { weekday: "short" });
+}
+
+/** Today as "YYYY-MM-DD" in the viewer's own timezone. */
+export function todayIso(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
 export const MONTH_NAMES = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
