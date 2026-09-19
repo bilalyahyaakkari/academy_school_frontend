@@ -97,13 +97,12 @@ export type GroupDetail = Group & {
   students: Student[];
 };
 
+/**
+ * A student on a given month's roster, with that month's invoice embedded.
+ * Students removed from the month are not returned at all.
+ */
 export type StudentMonthRow = StudentWithGroup & {
   payments: Payment[]; // length 0 or 1 (this month)
-  /**
-   * False when the student isn't on this month's roster but still has an
-   * invoice for it — i.e. they left with a balance open.
-   */
-  onRoster: boolean;
 };
 
 export type PaymentWithStudent = Payment & {

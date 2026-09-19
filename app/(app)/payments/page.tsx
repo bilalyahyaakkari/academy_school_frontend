@@ -153,7 +153,6 @@ export default async function PaymentsPage({ searchParams }: { searchParams: Sea
           studentName: s.fullName,
           phoneNumber: s.phoneNumber,
           groupName: s.group?.name ?? null,
-          onRoster: s.onRoster,
           payment: s.payments[0]
             ? {
                 id: s.payments[0].id,

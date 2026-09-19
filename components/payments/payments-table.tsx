@@ -37,11 +37,6 @@ type Row = {
   phoneNumber: string | null;
   groupName: string | null;
   payment: Payment | null;
-  /**
-   * False when the student isn't on this month's roster but still carries an
-   * invoice for it — they left with a balance open, so they stay listed.
-   */
-  onRoster: boolean;
 };
 
 export function PaymentsTable({
@@ -150,27 +145,12 @@ export function PaymentsTable({
             {rows.map((r) => (
               <TableRow key={r.studentId}>
                 <TableCell className="font-medium">
-                  <div className="flex items-center gap-2">
-                    <Link
-                      href={`/students/${r.studentId}`}
-                      className="hover:underline"
-                    >
-                      {r.studentName}
-                    </Link>
-                    {!r.onRoster && (
-                      <Badge
-                        variant="outline"
-                        className="border-amber-500/40 text-amber-600 dark:text-amber-400"
-                      >
-                        {t("roster.badge.left")}
-                      </Badge>
-                    )}
-                  </div>
-                  {!r.onRoster && (
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {t("roster.note.offRoster")}
-                    </p>
-                  )}
+                  <Link
+                    href={`/students/${r.studentId}`}
+                    className="hover:underline"
+                  >
+                    {r.studentName}
+                  </Link>
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {r.groupName ?? "—"}
@@ -210,11 +190,6 @@ export function PaymentsTable({
                 {r.groupName && (
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {r.groupName}
-                  </p>
-                )}
-                {!r.onRoster && (
-                  <p className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">
-                    {t("roster.note.offRoster")}
                   </p>
                 )}
               </div>

@@ -64,6 +64,16 @@ export function RosterTable({
           ? t("roster.toast.left", { month: monthName })
           : t("roster.toast.removed", { month: monthName }),
       );
+      // An invoice is only ever kept when money was recorded against it — say so,
+      // otherwise it looks like the removal didn't fully take.
+      const kept = res.data?.keptInvoices.length ?? 0;
+      if (kept > 0) {
+        toast.info(
+          kept === 1
+            ? t("roster.toast.invoiceKept", { count: kept })
+            : t("roster.toast.invoiceKept.plural", { count: kept }),
+        );
+      }
       setConfirm(null);
     });
   };

@@ -56,7 +56,7 @@ export async function removeStudentFromMonth(
   year: number,
   month: number,
   studentId: string,
-): Promise<ActionResult<{ keptPayment: { id: string; paidAmount: number } | null }>> {
+): Promise<ActionResult<{ deletedInvoices: number; keptInvoices: unknown[] }>> {
   try {
     const data = await rosterApi.remove(year, month, studentId);
     revalidateMonthScopedPages();
@@ -70,7 +70,7 @@ export async function markStudentLeft(
   year: number,
   month: number,
   studentId: string,
-): Promise<ActionResult<{ removedMonths: number }>> {
+): Promise<ActionResult<{ removedMonths: number; deletedInvoices: number; keptInvoices: unknown[] }>> {
   try {
     const data = await rosterApi.removeFrom(year, month, studentId);
     revalidateMonthScopedPages();
