@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { LocaleProvider } from "@/lib/i18n/client";
@@ -10,8 +10,22 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Academy — Admin",
-  description: "Sports academy management",
+  title: "Sakafa Academy — Admin",
+  description: "Students, groups, attendance and monthly payments",
+  // "Add to Home Screen" on iOS: launch without Safari's chrome and use the
+  // short name under the icon. The icon itself comes from app/apple-icon.png.
+  appleWebApp: {
+    capable: true,
+    title: "Sakafa",
+    statusBarStyle: "default",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#142473",
+  // Keep the app out from under the iPhone's notch / home indicator when it
+  // runs full-screen from the home screen.
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({
