@@ -1,4 +1,4 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { z } from "zod";
 
@@ -13,6 +13,18 @@ type BackendLoginResponse = {
   accessToken: string;
   user: { id: string; email: string; name: string | null };
 };
+
+/**
+ * The backend couldn't answer — it's down, or its database is unreachable.
+ *
+ * Kept separate from "wrong password" on purpose: reporting bad credentials for
+ * a server outage sends people off resetting a password that was never wrong.
+ * The backend answers 401 (and only 401) when the email/password is actually
+ * incorrect, so anything else means the sign-in never got that far.
+ */
+class BackendUnavailable extends CredentialsSignin {
+  code = "backend_unavailable";
+}
 
 export const { auth, handlers, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
@@ -37,14 +49,18 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
             body: JSON.stringify(parsed.data),
             cache: "no-store",
           });
-        } catch {
-          // Backend unreachable — surface as invalid credentials so we don't
-          // leak infra state, but log so it shows up in the dev console.
-          console.error("Auth: backend unreachable");
-          return null;
+        } catch (err) {
+          console.error("Auth: backend unreachable", err);
+          throw new BackendUnavailable();
         }
 
-        if (!res.ok) return null;
+        // 401 is the backend's answer for a wrong email or password.
+        if (res.status === 401) return null;
+
+        if (!res.ok) {
+          console.error(`Auth: backend returned ${res.status} on login`);
+          throw new BackendUnavailable();
+        }
 
         const data: BackendLoginResponse = await res.json();
         return {
