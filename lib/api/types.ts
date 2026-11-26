@@ -377,3 +377,24 @@ export type Trial = {
   group: GroupSummary | null;
   student: { id: string; fullName: string } | null;
 };
+
+// ---------- Families page ----------
+
+export type FamilyMember = {
+  id: string;
+  fullName: string;
+  phoneNumber: string | null;
+  familyId: string | null;
+  archived: boolean;
+  group: GroupSummary | null;
+};
+
+/** GET /students/families */
+export type FamiliesOverview = {
+  /** Existing families (2+ members). */
+  families: { familyId: string; members: FamilyMember[] }[];
+  /** Current students sharing a parent phone, not yet one family. */
+  suggestions: { phone: string; members: FamilyMember[] }[];
+  /** Every current student (for manual linking). */
+  students: FamilyMember[];
+};

@@ -8,7 +8,7 @@ import { SummaryStrip } from "@/components/app/summary-strip";
 import { StudentsFilterBar } from "@/components/students/students-filter-bar";
 import { StudentsTable } from "@/components/students/students-table";
 import { getT } from "@/lib/i18n/server";
-import { Plus, UserPlus2, Download, Upload, Sparkles } from "lucide-react";
+import { Plus, UserPlus2, Download, Upload, Sparkles, UsersRound } from "lucide-react";
 
 export async function generateMetadata() {
   const t = await getT();
@@ -87,6 +87,12 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
   // The page has no title bar: its buttons live in the summary card.
   const pageActions = (
     <>
+            <Button asChild variant="outline">
+              <Link href="/students/families">
+                <UsersRound className="size-4" />
+                {t("students.families.open")}
+              </Link>
+            </Button>
             <Button asChild variant="outline">
               <Link href="/students/import">
                 <Upload className="size-4" />

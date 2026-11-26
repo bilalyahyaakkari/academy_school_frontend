@@ -17,7 +17,7 @@ import { unlinkSibling } from "@/lib/actions/students";
 import { useT } from "@/lib/i18n/client";
 import type { SiblingSuggestion, SiblingSummary } from "@/lib/api/types";
 import { toast } from "sonner";
-import { ArrowUpRight, Info, Link2, Loader2, Unlink } from "lucide-react";
+import { ArrowUpRight, Info, Link2, Loader2, Unlink, UsersRound } from "lucide-react";
 import { LinkSiblingDialog } from "./link-sibling-dialog";
 
 /** "Siblings" card on the student page: linked brothers/sisters + link / unlink. */
@@ -55,10 +55,19 @@ export function SiblingsCard({
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
         <CardTitle className="text-base">{t("students.siblings.title")}</CardTitle>
-        <Button variant="outline" size="sm" onClick={() => setLinking(true)}>
-          <Link2 className="size-4" />
-          {t("students.siblings.link")}
-        </Button>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <Link
+            href="/students/families"
+            className="inline-flex items-center gap-1 text-xs font-medium text-sea-700 hover:underline"
+          >
+            <UsersRound aria-hidden className="size-3.5" />
+            {t("students.families.manageAll")}
+          </Link>
+          <Button variant="outline" size="sm" onClick={() => setLinking(true)}>
+            <Link2 className="size-4" />
+            {t("students.siblings.link")}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {siblings.length === 0 ? (

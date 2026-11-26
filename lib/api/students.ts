@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { SiblingSuggestion, StudentDetail, StudentWithGroup } from "./types";
+import type { FamiliesOverview, SiblingSuggestion, StudentDetail, StudentWithGroup } from "./types";
 
 export const studentsApi = {
   list: (filter: {
@@ -31,6 +31,11 @@ export const studentsApi = {
   /** Link two students as siblings (merges families). */
   linkSibling: (id: string, siblingId: string) =>
     api.post<StudentDetail>(`/students/${id}/siblings`, { siblingId }),
+  /** Families page data: existing families, same-phone suggestions, students. */
+  families: () => api.get<FamiliesOverview>("/students/families"),
+  /** Link several students as one family (merges existing families). */
+  linkFamily: (studentIds: string[]) =>
+    api.post<{ familyId: string; linked: number }>("/students/families", { studentIds }),
   /** Take a student out of their family. */
   unlinkSibling: (id: string) => api.delete<StudentDetail>(`/students/${id}/family`),
 

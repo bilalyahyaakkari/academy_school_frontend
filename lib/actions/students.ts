@@ -150,6 +150,7 @@ export async function bulkDeleteStudents(
  */
 function revalidateFamily() {
   revalidatePath("/students");
+  revalidatePath("/students/families");
   revalidatePath("/students/[id]", "page");
   revalidatePath("/payments");
   revalidatePath("/payments/outstanding");
@@ -202,6 +203,57 @@ export async function unlinkSibling(siblingId: string): Promise<ActionResult> {
     await studentsApi.unlinkSibling(siblingId);
   } catch (err) {
     return { success: false, error: await errorMessage(err, "students.error.unlinkSibling") };
+  }
+  revalidateFamily();
+  return { success: true };
+}
+
+/**
+ * Links 2–20 students into ONE family (Families page). Existing families
+ * among them are merged, so passing one member of a family plus new students
+ * adds them to it.
+ */
+export async function linkFamily(
+  ids: string[],
+): Promise<{ success: true; linked: number } | { success: false; error: string }> {
+  const unique = Array.from(new Set(ids));
+  if (unique.length < 2) {
+    const t = await getT();
+    return { success: false, error: t("students.families.error.pickTwo") };
+  }
+  let linked = 0;
+  try {
+    const res = await studentsApi.linkFamily(unique);
+    linked = res.linked;
+  } catch (err) {
+    return { success: false, error: await errorMessage(err, "students.families.error.link") };
+  }
+  revalidateFamily();
+  return { success: true, linked };
+}
+
+/**
+ * Moves one child out of their family into another one (or into a new family
+ * with `targetIds`). Linking alone would merge both families, so it's taken
+ * out first. `targetIds` = a member of the target family, or a lone student.
+ */
+export async function moveToFamily(studentId: string, targetIds: string[]): Promise<ActionResult> {
+  const targets = targetIds.filter((id) => id !== studentId);
+  if (targets.length === 0) {
+    const t = await getT();
+    return { success: false, error: t("students.families.error.pickTwo") };
+  }
+  try {
+    await studentsApi.unlinkSibling(studentId);
+  } catch (err) {
+    return { success: false, error: await errorMessage(err, "students.error.unlinkSibling") };
+  }
+  try {
+    await studentsApi.linkFamily([studentId, ...targets]);
+  } catch (err) {
+    // Out of the old family but not in the new one: refresh so the page shows that.
+    revalidateFamily();
+    return { success: false, error: await errorMessage(err, "students.families.error.link") };
   }
   revalidateFamily();
   return { success: true };
