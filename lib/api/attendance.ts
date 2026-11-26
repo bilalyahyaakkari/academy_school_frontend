@@ -1,5 +1,8 @@
 import { api } from "./client";
 import type {
+  DayAgenda,
+  GuestCandidate,
+  ReschedulePreview,
   AttendanceChecklist,
   AttendanceGrid,
   AttendanceOverview,
@@ -36,6 +39,31 @@ export const attendanceApi = {
       records,
       notes,
     }),
+
+  /** Sessions happening on a date, in time order (incl. moved / postponed). */
+  agenda: (date: string) => api.get<DayAgenda>(`/attendance/agenda?date=${date}`),
+
+  /** Check a one-session reschedule before confirming. `date` = original day. */
+  reschedulePreview: (body: { groupId: string; date: string; newDate: string; startTime: string; endTime: string }) =>
+    api.post<ReschedulePreview>("/attendance/reschedule/preview", body),
+  /** Move this one session (weekly schedule unchanged). */
+  reschedule: (body: { groupId: string; date: string; newDate: string; startTime: string; endTime: string }) =>
+    api.put<{ session: AttendanceChecklist; previous: ReschedulePreview["current"]; conflicts: ReschedulePreview["conflicts"] }>(
+      "/attendance/reschedule",
+      body,
+    ),
+  /** Put a rescheduled session back on its original day/times. */
+  clearReschedule: (groupId: string, date: string) =>
+    api.put<{ session: AttendanceChecklist }>("/attendance/reschedule/clear", { groupId, date }),
+
+  /** Players (other groups) who could join this session as guests. */
+  guestCandidates: (groupId: string, date: string) =>
+    api.get<GuestCandidate[]>(`/attendance/guests/candidates?groupId=${groupId}&date=${date}`),
+  /** Add a guest to one session (`date` = the session's original day). */
+  addGuest: (groupId: string, date: string, studentId: string) =>
+    api.post<AttendanceChecklist>("/attendance/guests", { groupId, date, studentId }),
+  removeGuest: (sessionId: string, studentId: string) =>
+    api.delete<AttendanceChecklist>(`/attendance/session/${sessionId}/guests/${studentId}`),
 
   /** Cancel a group's session on a day (rain, holiday…). */
   cancelDay: (groupId: string, date: string, reason?: string) =>
@@ -74,6 +102,8 @@ export const attendanceApi = {
         date: string;
         group: { id: string; name: string };
         present: boolean;
+        /** Joined another group's session as a guest. */
+        isGuest: boolean;
       }[];
       presentCount: number;
       totalCount: number;

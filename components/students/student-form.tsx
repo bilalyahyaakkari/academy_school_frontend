@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { formatCurrency, currentYearMonth } from "@/lib/utils";
 import { useLocale, useT } from "@/lib/i18n/client";
+import { FirstMonthFee } from "./first-month-fee";
 
 export type StudentFormGroup = {
   id: string;
@@ -43,6 +44,8 @@ export type StudentFormDefaults = {
   groupId?: string | null;
   monthlyFee?: number | null;
   notes?: string;
+  /** YYYY-MM-DD the student started training (edit mode). */
+  trainingStartDate?: string;
 };
 
 type Props = {
@@ -59,6 +62,12 @@ export function StudentForm({ groups, defaults, action, submitLabel }: Props) {
   const [pending, startTransition] = useTransition();
   const [year, setYear] = useState(defaults?.birthYear ?? "");
   const [groupId, setGroupId] = useState<string>(defaults?.groupId ?? "__none__");
+  const [feeOverride, setFeeOverride] = useState(
+    defaults?.monthlyFee != null ? String(defaults.monthlyFee) : "",
+  );
+  // Editing an existing student: the start date is a plain field and the
+  // first-month options don't apply (that invoice already exists).
+  const isEdit = Boolean(defaults?.id);
   const currentYear = currentYearMonth().year;
 
   // The fee that will apply if the override is left blank.
@@ -214,9 +223,31 @@ export function StudentForm({ groups, defaults, action, submitLabel }: Props) {
                   ? t("studentForm.fee.placeholderGroup", { fee: formatCurrency(inheritedFee) })
                   : t("studentForm.fee.placeholderDefault")
               }
-              defaultValue={defaults?.monthlyFee ?? ""}
+              value={feeOverride}
+              onChange={(e) => setFeeOverride(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">{t("studentForm.fee.help")}</p>
+          </div>
+
+          <div className="md:col-span-2">
+            {isEdit ? (
+              <div className="space-y-2">
+                <Label htmlFor="trainingStartDate">{t("firstMonth.startDate")}</Label>
+                <Input
+                  id="trainingStartDate"
+                  name="trainingStartDate"
+                  type="date"
+                  defaultValue={defaults?.trainingStartDate ?? ""}
+                  className="w-full sm:max-w-56"
+                />
+                <p className="text-xs text-muted-foreground">{t("firstMonth.edit.help")}</p>
+              </div>
+            ) : (
+              <FirstMonthFee
+                groupId={groupId !== "__none__" ? groupId : null}
+                feeOverride={feeOverride}
+              />
+            )}
           </div>
 
           <div className="space-y-2 md:col-span-2">

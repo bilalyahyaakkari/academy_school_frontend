@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { trialsApi, type TrialInput } from "@/lib/api/trials";
 import { ApiError } from "@/lib/api/client";
-import type { TrialStatus } from "@/lib/api/types";
+import type { FirstMonthChoice, TrialStatus } from "@/lib/api/types";
 import { getT } from "@/lib/i18n/server";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -98,7 +98,20 @@ export async function deleteTrial(id: string): Promise<ActionResult> {
   return { success: true };
 }
 
-/** Turns the trial into a real student, enrolled this month. */
+/**
+ * The first-month choice posted by <FirstMonthFee> (same rules as the student
+ * form): FULL / nothing → undefined (billed normally), bad amount → "invalid".
+ */
+function readFirstMonth(formData: FormData): FirstMonthChoice | undefined | "invalid" {
+  const mode = str(formData, "firstMonthMode");
+  if (mode !== "PRORATED" && mode !== "MANUAL") return undefined;
+  const raw = str(formData, "firstMonthAmount");
+  const amount = Number(raw);
+  if (raw === "" || !Number.isFinite(amount) || amount < 0 || amount > 1_000_000) return "invalid";
+  return { mode, amount: Math.round(amount * 100) / 100 };
+}
+
+/** Turns the trial into a real student, enrolled in their start month. */
 export async function convertTrial(
   id: string,
   formData: FormData,
@@ -108,6 +121,12 @@ export async function convertTrial(
     const t = await getT();
     return { success: false, error: t("trials.error.birthYear") };
   }
+  const firstMonth = readFirstMonth(formData);
+  if (firstMonth === "invalid") {
+    const t = await getT();
+    return { success: false, error: t("firstMonth.error.amount") };
+  }
+  const startDate = str(formData, "trainingStartDate");
   const feeStr = str(formData, "monthlyFee");
   let studentId: string;
   try {
@@ -117,6 +136,8 @@ export async function convertTrial(
       groupId: str(formData, "groupId") || null,
       phoneNumber: str(formData, "phoneNumber") || undefined,
       monthlyFee: feeStr === "" ? null : Number(feeStr),
+      trainingStartDate: /^\d{4}-\d{2}-\d{2}$/.test(startDate) ? startDate : undefined,
+      firstMonth,
     });
     studentId = res.studentId;
   } catch (err) {

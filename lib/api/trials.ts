@@ -34,6 +34,9 @@ export const trialsApi = {
       groupId?: string | null;
       phoneNumber?: string;
       monthlyFee?: number | null;
+      /** YYYY-MM-DD the child starts training. */
+      trainingStartDate?: string;
+      firstMonth?: { mode: "FULL" | "PRORATED" | "MANUAL"; amount?: number };
     },
   ) => api.post<{ trial: Trial; studentId: string }>(`/trials/${id}/convert`, body),
   remove: (id: string) => api.delete<{ success: true }>(`/trials/${id}`),

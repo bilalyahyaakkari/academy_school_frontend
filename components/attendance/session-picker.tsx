@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { GuardedLink } from "./unsaved-guard";
 import { cn } from "@/lib/utils";
 import { getT } from "@/lib/i18n/server";
-import { CalendarX, Check, ChevronRight } from "lucide-react";
+import { ArrowRight, CalendarClock, CalendarX, Check, ChevronRight, Clock } from "lucide-react";
 
 export type PickerEntry = {
   key: string;
@@ -13,6 +13,14 @@ export type PickerEntry = {
   start?: string;
   end?: string;
   status?: "now" | "next";
+  /** From the day's agenda: a weekly slot, moved away, or moved onto this day. */
+  kind?: "regular" | "postponed" | "moved-in";
+  /** A weekly slot whose times changed this day. */
+  retimed?: boolean;
+  /** postponed: where it went ("Sat 28 Nov", "18:00"). */
+  movedTo?: { day: string; time?: string };
+  /** moved-in: the day it came from ("Thu 26 Nov"). */
+  movedFrom?: string;
   /** Today's checklist is already saved. */
   saved?: { present: number; total: number } | null;
   /** Today's session was cancelled (rain, holiday…). */
@@ -33,12 +41,26 @@ export async function SessionPicker({
   sessions,
   others,
   dateLabel,
+  isToday = true,
+  dateShort,
 }: {
   sessions: PickerEntry[];
   others: PickerEntry[];
   dateLabel: string;
+  /** False when another day is open (?date=). */
+  isToday?: boolean;
+  /** "28 Nov" — names the day in labels when it isn't today. */
+  dateShort?: string;
 }) {
   const t = await getT();
+  const navLabel =
+    isToday || !dateShort
+      ? t("attendance.today.sessionsLabel")
+      : t("attendance.today.sessionsLabelDay", { date: dateShort });
+  const noSessions = isToday ? t("attendance.today.noSessions") : t("attendance.today.noSessionsDay");
+  const othersHint = isToday
+    ? t("attendance.today.otherGroupsHint")
+    : t("attendance.today.otherGroupsHintDay");
 
   const savedLabel = (e: PickerEntry) =>
     e.saved
@@ -48,10 +70,8 @@ export async function SessionPicker({
   return (
     <>
       {/* Phones / tablets: chips */}
-      <nav aria-label={t("attendance.today.sessionsLabel")} className="space-y-2 lg:hidden">
-        {sessions.length === 0 && (
-          <p className="text-sm text-muted-foreground">{t("attendance.today.noSessions")}</p>
-        )}
+      <nav aria-label={navLabel} className="space-y-2 lg:hidden">
+        {sessions.length === 0 && <p className="text-sm text-muted-foreground">{noSessions}</p>}
         <ul className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:px-6">
           {sessions.map((e) => (
             <li key={e.key} className="shrink-0">
@@ -59,6 +79,7 @@ export async function SessionPicker({
                 entry={e}
                 savedLabel={savedLabel(e)}
                 cancelledLabel={t("attendance.cancelled.badge")}
+                t={t}
               />
             </li>
           ))}
@@ -74,6 +95,7 @@ export async function SessionPicker({
                 entry={e}
                 savedLabel={savedLabel(e)}
                 cancelledLabel={t("attendance.cancelled.badge")}
+                t={t}
                 muted
               />
             </li>
@@ -87,7 +109,7 @@ export async function SessionPicker({
           <h2 className="font-semibold">{t("attendance.today.selectSession")}</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">{dateLabel}</p>
         </div>
-        <nav aria-label={t("attendance.today.sessionsLabel")}>
+        <nav aria-label={navLabel}>
           {sessions.length > 0 ? (
             <ul className="divide-y divide-border">
               {sessions.map((e) => (
@@ -97,9 +119,7 @@ export async function SessionPicker({
               ))}
             </ul>
           ) : (
-            <p className="px-4 py-6 text-sm text-muted-foreground">
-              {t("attendance.today.noSessions")}
-            </p>
+            <p className="px-4 py-6 text-sm text-muted-foreground">{noSessions}</p>
           )}
 
           {others.length > 0 && (
@@ -108,9 +128,7 @@ export async function SessionPicker({
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {t("attendance.today.otherGroups")}
                 </h3>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {t("attendance.today.otherGroupsHint")}
-                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{othersHint}</p>
               </div>
               <ul className="divide-y divide-border/60">
                 {others.map((e) => (
@@ -127,10 +145,10 @@ export async function SessionPicker({
   );
 }
 
-function TimeRange({ start, end }: { start: string; end?: string }) {
+function TimeRange({ start, end, struck }: { start: string; end?: string; struck?: boolean }) {
   // Kept LTR so "16:00–17:30" doesn't come out reversed in Arabic.
   return (
-    <bdi dir="ltr" className="tabular-nums">
+    <bdi dir="ltr" className={cn("tabular-nums", struck && "line-through decoration-sea-300")}>
       {start}
       {end ? `–${end}` : ""}
     </bdi>
@@ -200,7 +218,13 @@ function Row({
       />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-2">
-          <span className={cn("truncate", muted ? "font-medium" : "font-semibold")}>
+          <span
+            className={cn(
+              "truncate",
+              muted ? "font-medium" : "font-semibold",
+              e.kind === "postponed" && !e.selected && "text-muted-foreground",
+            )}
+          >
             {e.groupName}
           </span>
           {e.status === "now" && <Badge variant="success">{t("attendance.today.now")}</Badge>}
@@ -215,13 +239,20 @@ function Row({
         {e.start && (
           <span
             className={cn(
-              "mt-0.5 block text-xs",
+              "mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs",
               e.selected ? "text-accent-foreground" : "text-muted-foreground",
             )}
           >
-            <TimeRange start={e.start} end={e.end} />
+            <TimeRange start={e.start} end={e.end} struck={e.kind === "postponed"} />
+            {e.retimed && e.kind === "regular" && (
+              <span className="inline-flex items-center gap-1 font-medium text-sea-800 dark:text-sea-300">
+                <Clock aria-hidden className="size-3" />
+                {t("attendance.agenda.retimed")}
+              </span>
+            )}
           </span>
         )}
+        <Movement entry={e} t={t} />
       </span>
       {e.saved && <SavedMark saved={e.saved} label={savedLabel} />}
       <ChevronRight
@@ -239,11 +270,13 @@ function Chip({
   entry: e,
   savedLabel,
   cancelledLabel,
+  t,
   muted,
 }: {
   entry: PickerEntry;
   savedLabel: string;
   cancelledLabel: string;
+  t: Awaited<ReturnType<typeof getT>>;
   muted?: boolean;
 }) {
   return (
@@ -263,9 +296,13 @@ function Chip({
       <span className="font-semibold">{e.groupName}</span>
       {e.start && (
         <span className={cn("text-xs", e.selected ? "opacity-90" : "text-muted-foreground")}>
-          <TimeRange start={e.start} end={e.end} />
+          <TimeRange start={e.start} end={e.end} struck={e.kind === "postponed"} />
+          {e.retimed && e.kind === "regular" && (
+            <Clock aria-label={t("attendance.agenda.retimed")} className="ms-1 inline size-3 align-[-2px]" />
+          )}
         </span>
       )}
+      <Movement entry={e} t={t} compact />
       {e.saved && <SavedMark saved={e.saved} label={savedLabel} onPrimary={e.selected} />}
       {e.cancelled && (
         <span
@@ -280,4 +317,61 @@ function Chip({
       )}
     </GuardedLink>
   );
+}
+
+/**
+ * Where a moved session went ("→ Sat 28 Nov 18:00") or came from ("Moved from
+ * Thu 26 Nov"). Nothing for a regular slot.
+ */
+function Movement({
+  entry: e,
+  t,
+  compact,
+}: {
+  entry: PickerEntry;
+  t: Awaited<ReturnType<typeof getT>>;
+  compact?: boolean;
+}) {
+  const tone = e.selected && compact ? "opacity-90" : e.selected ? "text-accent-foreground" : "text-sea-800 dark:text-sea-300";
+  if (e.kind === "postponed" && e.movedTo) {
+    const when = `${e.movedTo.day}${e.movedTo.time ? ` ${e.movedTo.time}` : ""}`;
+    return (
+      <span
+        className={cn(
+          "items-center gap-1 text-xs font-medium",
+          compact ? "inline-flex" : "mt-0.5 flex",
+          tone,
+        )}
+      >
+        <ArrowRight aria-hidden className="size-3 shrink-0 rtl:rotate-180" />
+        <span aria-hidden>
+          {e.movedTo.day}
+          {e.movedTo.time && (
+            <>
+              {" "}
+              <bdi dir="ltr" className="tabular-nums">
+                {e.movedTo.time}
+              </bdi>
+            </>
+          )}
+        </span>
+        <span className="sr-only">{t("attendance.agenda.movedTo", { when })}</span>
+      </span>
+    );
+  }
+  if (e.kind === "moved-in" && e.movedFrom) {
+    return (
+      <span
+        className={cn(
+          "items-center gap-1 text-xs font-medium",
+          compact ? "inline-flex" : "mt-0.5 flex",
+          tone,
+        )}
+      >
+        <CalendarClock aria-hidden className="size-3 shrink-0" />
+        {t("attendance.agenda.movedFrom", { date: e.movedFrom })}
+      </span>
+    );
+  }
+  return null;
 }

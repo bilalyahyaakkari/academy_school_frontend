@@ -20,6 +20,7 @@ import {
   PaymentProgress,
   RowActions,
   SizeChip,
+  SupplierOrderChip,
   type RowHandlers,
 } from "./uniform-row-parts";
 
@@ -82,7 +83,7 @@ function UniformsTable({
               />
             </TableHead>
             <TableHead>{t("table.student")}</TableHead>
-            <TableHead className="w-20">{t("uniforms.table.size")}</TableHead>
+            <TableHead className="w-32">{t("uniforms.table.size")}</TableHead>
             <TableHead className="w-44">{t("uniforms.table.payment")}</TableHead>
             <TableHead className="w-32">{t("uniforms.table.received")}</TableHead>
             <TableHead className="text-end">
@@ -123,7 +124,10 @@ function UniformsTable({
                   )}
                 </TableCell>
                 <TableCell>
-                  <SizeChip size={u.size} />
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <SizeChip size={u.size} />
+                    {u.supplierOrder && <SupplierOrderChip order={u.supplierOrder} />}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <PaymentProgress u={u} className="w-36" />
@@ -171,6 +175,7 @@ function UniformsCards({ rows, selected, onToggleOne, handlers }: ListProps) {
                 />
               </span>
               <StudentName u={u} className="flex-1" />
+              {u.supplierOrder && <SupplierOrderChip order={u.supplierOrder} />}
               <SizeChip size={u.size} />
             </div>
 

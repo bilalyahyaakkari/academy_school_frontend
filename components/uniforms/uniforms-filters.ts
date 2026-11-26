@@ -16,7 +16,12 @@ export const NO_FILTERS: UniformFilters = { tab: "all", size: null, q: "" };
 
 /** The size an order is grouped / filtered under ("—" when blank). */
 export function sizeKey(u: UniformWithStudent): string {
-  const raw = u.size?.trim() || "—";
+  return normalizeSize(u.size);
+}
+
+/** A free-typed size label as it's grouped ("xxl" → "XXL", blank → "—"). */
+export function normalizeSize(size: string | null | undefined): string {
+  const raw = size?.trim() || "—";
   // "xxl" and "XXL" are the same size: letter sizes are grouped upper-case.
   return LETTER_SIZES.includes(raw.toUpperCase()) ? raw.toUpperCase() : raw;
 }
@@ -101,7 +106,7 @@ const LETTER_SIZES = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "2XL", "XXXL", "3
  * then letter sizes in size order (S, M, L, XL, XXL…), then anything else
  * alphabetically.
  */
-function compareSizes(a: string, b: string): number {
+export function compareSizes(a: string, b: string): number {
   const num = (s: string) => {
     const m = /^(\d+(?:\.\d+)?)\s*[a-z]*$/i.exec(s);
     return m ? Number(m[1]) : null;

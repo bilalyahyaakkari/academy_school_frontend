@@ -38,6 +38,13 @@ export const groupsStrings = {
     "groups.toast.moved": "{name} moved to {group}",
     "groups.toast.removedFromGroup": "{name} no longer has a group",
     "groups.error.changeGroup": "Couldn't change the group",
+
+    // ---- Drag & drop ----
+    "groups.drag.hint": "Drag a player onto a group card to move them.",
+    "groups.drag.ghost": "{name} → …",
+    "groups.drag.dropHere": "Move {name} here",
+    "groups.drag.moving": "Moving…",
+    "groups.toast.undo": "Undo",
   },
   ar: {
     // ---- Groups overview (/groups) ----
@@ -74,5 +81,12 @@ export const groupsStrings = {
     "groups.toast.moved": "{name} انتقل على {group}",
     "groups.toast.removedFromGroup": "{name} صار بلا مجموعة",
     "groups.error.changeGroup": "ما زبط تغيير المجموعة",
+
+    // ---- Drag & drop ----
+    "groups.drag.hint": "اسحب لاعب وحطّو على كرت مجموعة لتنقلو.",
+    "groups.drag.ghost": "{name} ← …",
+    "groups.drag.dropHere": "انقل {name} لهون",
+    "groups.drag.moving": "عم ننقل…",
+    "groups.toast.undo": "تراجع",
   },
 } as const;

@@ -23,7 +23,9 @@ import {
 } from "@/lib/actions/uniforms";
 import { formatCurrency } from "@/lib/utils";
 import { useT } from "@/lib/i18n/client";
-import type { UniformWithStudent } from "@/lib/api/types";
+import type { SupplierOrderPreview, UniformWithStudent } from "@/lib/api/types";
+import { previewSupplierOrder } from "@/lib/actions/supplier-orders";
+import { PrepareSupplierOrderDialog } from "./prepare-supplier-order-dialog";
 import { UniformDialog } from "./uniform-dialog";
 import { UniformAddPaymentDialog } from "./uniform-add-payment-dialog";
 import { useReceiptSender } from "@/components/payments/receipt-dialog";
@@ -69,6 +71,11 @@ export function UniformsClient({
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
   const [bulkPending, startBulkTransition] = useTransition();
   const [, startTransition] = useTransition();
+  const [preparing, setPreparing] = useState<{
+    ids: string[];
+    preview: SupplierOrderPreview;
+  } | null>(null);
+  const [preparePending, startPrepareTransition] = useTransition();
   const receipts = useReceiptSender();
 
   const summary = summarize(uniforms);
@@ -125,6 +132,19 @@ export function UniformsClient({
       );
       setSelected(new Set());
       setBulkConfirmOpen(false);
+    });
+  };
+
+  // Quantities are fetched first, so the dialog opens complete.
+  const onPrepareOrder = () => {
+    const ids = Array.from(visibleSelected);
+    startPrepareTransition(async () => {
+      const res = await previewSupplierOrder(ids);
+      if (res.success === false) {
+        toast.error(res.error);
+        return;
+      }
+      setPreparing({ ids, preview: res.preview });
     });
   };
 
@@ -234,6 +254,8 @@ export function UniformsClient({
             selectedCount={selectedCount}
             onClearSelection={() => setSelected(new Set())}
             onBulkDelete={() => setBulkConfirmOpen(true)}
+            onPrepareOrder={onPrepareOrder}
+            preparePending={preparePending}
           />
         )}
 
@@ -294,6 +316,15 @@ export function UniformsClient({
       )}
 
       {receipts.dialog}
+
+      {preparing && (
+        <PrepareSupplierOrderDialog
+          uniformIds={preparing.ids}
+          preview={preparing.preview}
+          onClose={() => setPreparing(null)}
+          onCreated={() => setSelected(new Set())}
+        />
+      )}
 
       <Dialog open={undoOpen} onOpenChange={setUndoOpen}>
         <DialogContent>

@@ -59,6 +59,11 @@ export async function GroupCard(props: GroupCardProps) {
               "shadow-sm hover:border-sea-500 hover:shadow-md",
               isGroup ? "border-border" : "border-dashed border-sea-300",
             ),
+        // Drag & drop (see group-dnd.tsx): valid targets light up while a
+        // player is dragged; the one under the pointer gets a stronger ring.
+        "group-data-[drop=valid]/drop:bg-sea-100 group-data-[drop=valid]/drop:text-sea-950 group-data-[drop=valid]/drop:ring-2 group-data-[drop=valid]/drop:ring-sea-500",
+        "group-data-[drop=over]/drop:border-sea-700 group-data-[drop=over]/drop:bg-sea-100 group-data-[drop=over]/drop:text-sea-950 group-data-[drop=over]/drop:shadow-md group-data-[drop=over]/drop:ring-4 group-data-[drop=over]/drop:ring-sea-500",
+        "group-data-[drop=pending]/drop:bg-sea-100 group-data-[drop=pending]/drop:text-sea-950 group-data-[drop=pending]/drop:ring-2 group-data-[drop=pending]/drop:ring-sea-500",
       )}
     >
       {selected && (

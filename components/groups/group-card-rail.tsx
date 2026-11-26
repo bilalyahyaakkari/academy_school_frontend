@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
+import { GroupDropTarget, useDropTargetVisible } from "./group-dnd";
 
 /**
  * The row of group cards: a horizontally scrolling, snapping row on mobile and
@@ -38,7 +40,30 @@ export function GroupCardRail({
   );
 }
 
-/** One slot in the rail — fixed width while the row scrolls, a grid cell from `md` up. */
-export function GroupCardRailItem({ children }: { children: ReactNode }) {
-  return <li className="w-[16.5rem] shrink-0 snap-start md:w-auto">{children}</li>;
+/**
+ * One slot in the rail — fixed width while the row scrolls, a grid cell from
+ * `md` up. With `dropKey` the card is also a drop target for dragged players
+ * (group id, or "none" for Unassigned).
+ */
+export function GroupCardRailItem({
+  children,
+  dropKey,
+  hiddenUnlessDragging,
+}: {
+  children: ReactNode;
+  dropKey?: string;
+  /** Render only while a player is being dragged (an empty Unassigned card). */
+  hiddenUnlessDragging?: boolean;
+}) {
+  const visible = useDropTargetVisible(dropKey ?? "");
+  return (
+    <li
+      className={cn(
+        "w-[16.5rem] shrink-0 snap-start md:w-auto",
+        hiddenUnlessDragging && !visible && "hidden",
+      )}
+    >
+      {dropKey ? <GroupDropTarget dropKey={dropKey}>{children}</GroupDropTarget> : children}
+    </li>
+  );
 }

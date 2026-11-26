@@ -50,6 +50,7 @@ export default async function EditStudentPage({ params }: { params: Params }) {
           groupId: student.groupId,
           monthlyFee: student.monthlyFee,
           notes: student.notes ?? undefined,
+          trainingStartDate: student.trainingStartDate?.slice(0, 10),
         }}
         action={action}
         submitLabel={t("studentForm.submit.save")}

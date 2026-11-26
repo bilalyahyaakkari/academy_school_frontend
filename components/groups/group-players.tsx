@@ -13,14 +13,16 @@ import {
 import { formatAge } from "@/lib/utils";
 import { getLocale, getT } from "@/lib/i18n/server";
 import { ChangeGroupDialog, type GroupOption } from "./change-group-dialog";
+import { DraggablePlayer } from "./group-dnd";
 import { initials } from "./group-format";
-import { Plus, UsersRound } from "lucide-react";
+import { GripVertical, Move, Plus, UsersRound } from "lucide-react";
 
 export type PlayerRow = { id: string; fullName: string; dateOfBirth: string };
 
 /**
  * The selected group's players: a table on desktop, stacked cards on mobile.
- * Every row has a "Change group" dialog.
+ * Rows can be dragged onto a group card (mouse / trackpad); every row also
+ * has a "Change group" dialog — the keyboard and touch-screen alternative.
  */
 export async function GroupPlayers({
   players,
@@ -74,6 +76,12 @@ export async function GroupPlayers({
 
   return (
     <>
+      {/* Only where a mouse / trackpad can drag (HTML5 drag doesn't work on touch). */}
+      <p className="hidden items-center gap-1.5 text-sm text-muted-foreground pointer-fine:flex">
+        <Move aria-hidden className="size-4 shrink-0" />
+        {t("groups.drag.hint")}
+      </p>
+
       {/* Desktop: table */}
       <Card className="hidden overflow-hidden md:block">
         <Table>
@@ -95,9 +103,15 @@ export async function GroupPlayers({
           </TableHeader>
           <TableBody>
             {players.map((p) => (
-              <TableRow key={p.id}>
+              <DraggablePlayer key={p.id} id={p.id} name={p.fullName} as="tr">
                 <TableCell className="py-3 ps-5">
-                  <PlayerName player={p} />
+                  <span className="flex items-center gap-2">
+                    <GripVertical
+                      aria-hidden
+                      className="-ms-2 hidden size-4 shrink-0 text-muted-foreground pointer-fine:block"
+                    />
+                    <PlayerName player={p} />
+                  </span>
                 </TableCell>
                 <TableCell className="py-3 tabular-nums">
                   {formatAge(p.dateOfBirth, locale)}
@@ -111,7 +125,7 @@ export async function GroupPlayers({
                     groups={groups}
                   />
                 </TableCell>
-              </TableRow>
+              </DraggablePlayer>
             ))}
           </TableBody>
         </Table>
@@ -120,7 +134,7 @@ export async function GroupPlayers({
       {/* Mobile: stacked cards */}
       <ul className="space-y-2 md:hidden">
         {players.map((p) => (
-          <li key={p.id}>
+          <DraggablePlayer key={p.id} id={p.id} name={p.fullName} as="li">
             <Card className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <PlayerName player={p} />
@@ -138,7 +152,7 @@ export async function GroupPlayers({
                 />
               </div>
             </Card>
-          </li>
+          </DraggablePlayer>
         ))}
       </ul>
     </>
@@ -149,6 +163,8 @@ function PlayerName({ player }: { player: PlayerRow }) {
   return (
     <Link
       href={`/students/${player.id}`}
+      // Not a link drag: grabbing the name drags the whole row instead.
+      draggable={false}
       className="group/player inline-flex min-w-0 items-center gap-3 rounded-md font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span

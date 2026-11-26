@@ -67,6 +67,8 @@ export type Student = {
   notes: string | null;
   /** Siblings share a familyId (null = no linked siblings). */
   familyId: string | null;
+  /** Day the student started training. */
+  trainingStartDate: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -76,6 +78,10 @@ export type StudentWithGroup = Student & {
 };
 
 export type Payment = {
+  /** Amount fixed by the admin (e.g. a prorated first month): never re-priced. */
+  locked: boolean;
+  /** How a fixed amount was worked out, e.g. "First month: 55 × 4/8 sessions". */
+  pricingNote: string | null;
   id: string;
   studentId: string;
   month: number;
@@ -161,6 +167,8 @@ export type Uniform = {
 export type UniformWithStudent = Uniform & {
   /** `archived` = the student has left; their unpaid uniforms still count. */
   student: { id: string; fullName: string; phoneNumber: string | null; archived: boolean };
+  /** The supplier order this request was last ordered in. */
+  supplierOrder: { id: string; number: number; status: SupplierOrderStatus } | null;
 };
 
 // ---------- Monthly roster ----------
@@ -239,6 +247,14 @@ export type AttendanceSessionSummary = {
   /** Cancelled sessions (rain, holiday…) never count as absences. */
   cancelled: boolean;
   cancelReason: string | null;
+  originalDate: string;
+  actualDate: string;
+  startTime: string | null;
+  endTime: string | null;
+  originalStart: string | null;
+  originalEnd: string | null;
+  postponed: boolean;
+  rescheduled: boolean;
   presentCount: number;
   totalCount: number;
 };
@@ -249,6 +265,8 @@ export type AttendanceGridStudent = {
   phoneNumber: string | null;
   /** False = they have marks this month but are no longer on the roster. */
   onRoster: boolean;
+  /** Only came as a guest this month. */
+  isGuest: boolean;
   presentCount: number;
   absentCount: number;
   /** One cell per checklist, in date order. null = not on that checklist. */
@@ -277,10 +295,27 @@ export type AttendanceChecklist = {
     fullName: string;
     phoneNumber: string | null;
     present: boolean;
+    /** A player from another group, on this session only. */
+    isGuest: boolean;
+    /** The guest's own group. */
+    homeGroup: GroupSummary | null;
   }[];
   presentCount: number;
   /** True until the checklist has been saved for the first time. */
   isNew: boolean;
+  /** The session's own day (its identity). */
+  originalDate: string;
+  /** When it actually happens (differs from originalDate when postponed). */
+  actualDate: string;
+  startTime: string | null;
+  endTime: string | null;
+  /** Regular times of the original day. */
+  originalStart: string | null;
+  originalEnd: string | null;
+  /** Moved to another day. */
+  postponed: boolean;
+  /** Moved at all (another day, or other times the same day). */
+  rescheduled: boolean;
   /** Cancelled (rain, holiday…): kept for the record, never an absence. */
   cancelled: boolean;
   cancelReason: string | null;
@@ -397,4 +432,122 @@ export type FamiliesOverview = {
   suggestions: { phone: string; members: FamilyMember[] }[];
   /** Every current student (for manual linking). */
   students: FamilyMember[];
+};
+
+// ---------- Attendance: day agenda, reschedule, guests ----------
+
+export type AgendaEntry = {
+  /** regular: weekly slot · postponed: moved away from this day · moved-in: moved onto this day */
+  kind: "regular" | "postponed" | "moved-in";
+  groupId: string;
+  groupName: string;
+  coachName: string | null;
+  startTime: string | null;
+  endTime: string | null;
+  sessionId: string | null;
+  cancelled: boolean;
+  cancelReason: string | null;
+  /** moved-in: the day it was moved from. */
+  originalDate: string | null;
+  /** postponed: where it went. */
+  movedTo: { date: string; startTime: string | null; endTime: string | null } | null;
+  /** Same day, other times than the weekly slot. */
+  retimed: boolean;
+  saved: boolean;
+  presentCount: number;
+  totalCount: number;
+};
+
+/** GET /attendance/agenda?date= */
+export type DayAgenda = { date: string; entries: AgendaEntry[] };
+
+export type RescheduleConflict = {
+  type: "group" | "coach";
+  groupId: string;
+  groupName: string;
+  coachName: string | null;
+  startTime: string;
+  endTime: string;
+  date: string;
+};
+
+/** POST /attendance/reschedule/preview */
+export type ReschedulePreview = {
+  group: { id: string; name: string; coachName: string | null };
+  current: {
+    date: string;
+    startTime: string | null;
+    endTime: string | null;
+    originalDate: string;
+    originalStart: string | null;
+    originalEnd: string | null;
+  };
+  proposed: { date: string; startTime: string; endTime: string };
+  unchanged: boolean;
+  conflicts: RescheduleConflict[];
+  /** Attendance already saved — it moves with the session. */
+  hasRecords: boolean;
+  recordCount: number;
+  guestCount: number;
+  trialsCount: number;
+};
+
+export type GuestCandidate = {
+  id: string;
+  fullName: string;
+  phoneNumber: string | null;
+  group: GroupSummary | null;
+};
+
+// ---------- First-month fee ----------
+
+/** GET /students/first-month-quote */
+export type FirstMonthQuote = {
+  startDate: string;
+  year: number;
+  month: number;
+  /** The student's monthly price under the normal rules. */
+  monthlyFee: number;
+  /** Sessions in the month / left from the start date. */
+  total: number;
+  remaining: number;
+  /** fee × remaining ÷ total (null when the month has no sessions). */
+  suggested: number | null;
+  /** Starts after the month's first session. */
+  midMonth: boolean;
+  sessions: string[];
+};
+
+export type FirstMonthChoice = { mode: "FULL" | "PRORATED" | "MANUAL"; amount?: number };
+
+// ---------- Supplier orders ----------
+
+export type SupplierOrderStatus = "DRAFT" | "ORDERED";
+/** DRAFT · ORDERED (nothing in yet) · PARTIAL (something missing) · RECEIVED */
+export type SupplierOrderState = "DRAFT" | "ORDERED" | "PARTIAL" | "RECEIVED";
+
+export type SupplierOrder = {
+  id: string;
+  number: number;
+  status: SupplierOrderStatus;
+  state: SupplierOrderState;
+  notes: string | null;
+  orderedAt: string | null;
+  createdAt: string;
+  /** What was ordered (snapshot). */
+  lines: { size: string; quantity: number }[];
+  /** Per size: ordered, received so far, missing, extra. */
+  reconciliation: { size: string; ordered: number; received: number; missing: number; extra: number }[];
+  totals: { ordered: number; received: number; missing: number; extra: number };
+  /** Delivery batches, oldest first. */
+  receipts: { id: string; receivedAt: string; note: string | null; createdAt: string; lines: { size: string; quantity: number }[] }[];
+  /** Students' requests in this order (internal — never in supplier text). */
+  uniforms: { id: string; size: string; isReceived: boolean; isPaid: boolean; student: { id: string; fullName: string } }[];
+};
+
+export type SupplierOrderPreview = {
+  lines: { size: string; quantity: number }[];
+  total: number;
+  /** Chosen requests that are already in an open order. */
+  alreadyOrdered: { uniformId: string; size: string; studentName: string; orderId: string; orderNumber: number }[];
 };

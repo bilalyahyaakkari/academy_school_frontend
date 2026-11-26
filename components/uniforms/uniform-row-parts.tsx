@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   Check,
   CheckCircle2,
@@ -10,6 +11,7 @@ import {
   Pencil,
   RotateCcw,
   Trash2,
+  Truck,
   Wallet,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +56,35 @@ export function SizeChip({ size }: { size: string }) {
     <Badge variant="outline" className="shrink-0 rounded-full px-2 font-semibold">
       {size || "—"}
     </Badge>
+  );
+}
+
+/** "#12": this request is in supplier order 12 — links to it. */
+export function SupplierOrderChip({
+  order,
+}: {
+  order: NonNullable<UniformWithStudent["supplierOrder"]>;
+}) {
+  const t = useT();
+  const label =
+    order.status === "DRAFT"
+      ? t("uniforms.orders.chip.draftTitle", { number: order.number })
+      : t("uniforms.orders.chip.title", { number: order.number });
+  return (
+    <Link
+      href={`/uniforms/orders/${order.id}`}
+      title={label}
+      aria-label={label}
+      className={cn(
+        "inline-flex h-8 shrink-0 items-center gap-1 rounded-full border px-2 text-[11px] font-medium tabular-nums whitespace-nowrap transition-colors outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring sm:h-6",
+        order.status === "DRAFT"
+          ? "border-dashed border-sea-300 text-muted-foreground"
+          : "border-border text-sea-800",
+      )}
+    >
+      <Truck className="size-3" aria-hidden />
+      {t("uniforms.orders.chip", { number: order.number })}
+    </Link>
   );
 }
 

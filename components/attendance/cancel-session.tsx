@@ -76,11 +76,14 @@ export function CancelSessionButton({
   groupId,
   groupName,
   date,
+  displayDate,
 }: {
   groupId: string;
   groupName: string;
-  /** YYYY-MM-DD */
+  /** YYYY-MM-DD — the session's original day (its identity). */
   date: string;
+  /** The day it actually happens, when it was moved. Defaults to `date`. */
+  displayDate?: string;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -127,7 +130,7 @@ export function CancelSessionButton({
           <DialogHeader>
             <DialogTitle>{t("attendance.cancel.title", { group: groupName })}</DialogTitle>
             <DialogDescription>
-              {t("attendance.cancel.desc", { date: formatDateOnly(date, locale) })}
+              {t("attendance.cancel.desc", { date: formatDateOnly(displayDate ?? date, locale) })}
             </DialogDescription>
           </DialogHeader>
 
@@ -193,14 +196,17 @@ export function CancelledBanner({
   groupId,
   groupName,
   date,
+  displayDate,
   reason,
   isToday,
   trialsCount = 0,
 }: {
   groupId: string;
   groupName: string;
-  /** YYYY-MM-DD */
+  /** YYYY-MM-DD — the session's original day (its identity). */
   date: string;
+  /** The day it actually happens, when it was moved. Defaults to `date`. */
+  displayDate?: string;
   reason: string | null;
   isToday: boolean;
   /** Children who were coming to try this group that day. */
@@ -208,7 +214,9 @@ export function CancelledBanner({
 }) {
   const t = useT();
   const [pending, startTransition] = useTransition();
-  const shareUrl = whatsappShareUrl(shareMessage({ groupName, date, reason, isToday }));
+  const shareUrl = whatsappShareUrl(
+    shareMessage({ groupName, date: displayDate ?? date, reason, isToday }),
+  );
 
   const onUndo = () => {
     startTransition(async () => {

@@ -25,15 +25,17 @@ import { birthYear, currentYearMonth, formatCurrency } from "@/lib/utils";
 import { useT } from "@/lib/i18n/client";
 import type { Trial } from "@/lib/api/types";
 import type { TrialGroupOption } from "./trial-dialog";
+import { FirstMonthFee } from "@/components/students/first-month-fee";
 import { toast } from "sonner";
 import { Loader2, UserPlus } from "lucide-react";
 
 const NO_GROUP = "__none__";
 
 /**
- * "Join as student": creates a real student (enrolled this month) from the
- * trial. The year of birth is required (stored as YYYY-01-01, like the student
- * form); group, phone and name come prefilled.
+ * "Join as student": creates a real student (enrolled in their start month)
+ * from the trial. The year of birth is required (stored as YYYY-01-01, like
+ * the student form); group, phone and name come prefilled. Starting mid-month
+ * offers the same first-month fee options as the new-student form.
  */
 export function ConvertTrialDialog({
   trial,
@@ -50,6 +52,7 @@ export function ConvertTrialDialog({
   const [groupId, setGroupId] = useState(
     trial.groupId && groups.some((g) => g.id === trial.groupId) ? trial.groupId : NO_GROUP,
   );
+  const [feeOverride, setFeeOverride] = useState("");
   const currentYear = currentYearMonth().year;
   const groupFee = groups.find((g) => g.id === groupId)?.monthlyFee;
 
@@ -164,8 +167,15 @@ export function ConvertTrialDialog({
                   ? t("studentForm.fee.placeholderGroup", { fee: formatCurrency(groupFee) })
                   : t("studentForm.fee.placeholderDefault")
               }
+              value={feeOverride}
+              onChange={(e) => setFeeOverride(e.target.value)}
             />
           </div>
+
+          <FirstMonthFee
+            groupId={groupId !== NO_GROUP ? groupId : null}
+            feeOverride={feeOverride}
+          />
 
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>

@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { FamiliesOverview, SiblingSuggestion, StudentDetail, StudentWithGroup } from "./types";
+import type { FirstMonthQuote, FamiliesOverview, SiblingSuggestion, StudentDetail, StudentWithGroup } from "./types";
 
 export const studentsApi = {
   list: (filter: {
@@ -31,6 +31,15 @@ export const studentsApi = {
   /** Link two students as siblings (merges families). */
   linkSibling: (id: string, siblingId: string) =>
     api.post<StudentDetail>(`/students/${id}/siblings`, { siblingId }),
+  /** Suggested first-month fee for a start date (mid-month proration). */
+  firstMonthQuote: (q: { startDate: string; groupId?: string | null; monthlyFee?: number | null; studentId?: string }) => {
+    const qs = new URLSearchParams({ startDate: q.startDate });
+    if (q.groupId) qs.set("groupId", q.groupId);
+    if (q.monthlyFee != null) qs.set("monthlyFee", String(q.monthlyFee));
+    if (q.studentId) qs.set("studentId", q.studentId);
+    return api.get<FirstMonthQuote>(`/students/first-month-quote?${qs}`);
+  },
+
   /** Families page data: existing families, same-phone suggestions, students. */
   families: () => api.get<FamiliesOverview>("/students/families"),
   /** Link several students as one family (merges existing families). */

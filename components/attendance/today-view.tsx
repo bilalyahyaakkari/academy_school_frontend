@@ -1,32 +1,20 @@
 import Link from "next/link";
 import { groupsApi } from "@/lib/api/groups";
 import { attendanceApi } from "@/lib/api/attendance";
-import type { GroupWithCount, ScheduleSlot } from "@/lib/api/types";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import type { AgendaEntry } from "@/lib/api/types";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SessionPicker, type PickerEntry } from "./session-picker";
 import { AttendanceSheet, type SheetChecklist } from "./attendance-sheet";
 import { CancelSessionButton, CancelledBanner } from "./cancel-session";
+import { PostponedBanner, RescheduleSessionButton } from "./reschedule-session";
+import { SessionPanelHeader } from "./session-header";
 import { TrialsToday } from "./trials-today";
-import { ACADEMY_TZ, academyToday, todayIso } from "@/lib/utils";
-import { getT } from "@/lib/i18n/server";
-import { CalendarCheck, CircleAlert } from "lucide-react";
-
-const WEEKDAYS: ScheduleSlot["day"][] = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
-
-/** Today's weekday name in the academy's timezone ("Monday"…). */
-export function academyWeekday(): ScheduleSlot["day"] {
-  const { year, month, day } = academyToday();
-  return WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
-}
+import { GuardedLink } from "./unsaved-guard";
+import { addDays, dayLabel, isoDay, shortDate } from "./session-dates";
+import { ACADEMY_TZ, todayIso, weekdayShort } from "@/lib/utils";
+import { getLocale, getT } from "@/lib/i18n/server";
+import { CalendarCheck, ChevronLeft, ChevronRight, CircleAlert } from "lucide-react";
 
 /** The wall-clock time in Beirut as "HH:MM". */
 function academyNowHm(): string {
@@ -41,42 +29,52 @@ function academyNowHm(): string {
 }
 
 /** "9:5" → "09:05", so times compare as plain strings. */
-function hm(value: string): string {
+function hm(value: string | null | undefined): string {
+  if (!value) return "";
   const [h = "0", m = "0"] = value.split(":");
   return `${h.padStart(2, "0")}:${m.padStart(2, "0")}`;
 }
 
-type Session = { group: GroupWithCount; start: string; end: string };
+type Entry = AgendaEntry & { start: string; end: string };
 
-function todayHref(groupId: string, at?: string) {
-  const base = `/attendance?tab=today&group=${encodeURIComponent(groupId)}`;
-  return at ? `${base}&at=${encodeURIComponent(at)}` : base;
+/** /attendance?tab=today[&date=][&group=&at=|&session=] — `date` only when not today. */
+export function todayHref(
+  date: string,
+  p: { group?: string; at?: string; session?: string } = {},
+): string {
+  const q = new URLSearchParams({ tab: "today" });
+  if (isoDay(date) !== todayIso()) q.set("date", isoDay(date));
+  if (p.session) q.set("session", p.session);
+  if (p.group) q.set("group", p.group);
+  if (p.at) q.set("at", p.at);
+  return `/attendance?${q.toString()}`;
 }
 
 /**
- * The "Today" tab: today's sessions on the start side, the selected group's
- * register on the other. Everything comes from the URL (?group=&at=), so it's
- * server-rendered and survives a refresh.
+ * The "Today" tab: the day's sessions (from the agenda — regular slots, moved
+ * and postponed ones) on the start side, the selected session's register on
+ * the other. Everything comes from the URL (?date=&group=&at=&session=), so
+ * it's server-rendered and survives a refresh.
  */
 export async function TodayView({
+  date,
   groupParam,
   atParam,
-  dateLabel,
+  sessionParam,
 }: {
+  /** YYYY-MM-DD (validated by the page). */
+  date: string;
   groupParam?: string;
   atParam?: string;
-  dateLabel: string;
+  sessionParam?: string;
 }) {
   const t = await getT();
+  const locale = await getLocale();
   const today = todayIso();
-  const { year, month } = academyToday();
-  const weekday = academyWeekday();
+  const isToday = date === today;
   const now = academyNowHm();
 
-  const [groups, overview] = await Promise.all([
-    groupsApi.list(),
-    attendanceApi.overview(year, month),
-  ]);
+  const [groups, agenda] = await Promise.all([groupsApi.list(), attendanceApi.agenda(date)]);
 
   if (groups.length === 0) {
     return (
@@ -92,163 +90,287 @@ export async function TodayView({
     );
   }
 
-  // ---- Today's sessions, by start time (a group with two slots shows twice) ----
-  const sessions: Session[] = groups
-    .flatMap((group) =>
-      (group.schedule ?? [])
-        .filter((s) => s.day === weekday)
-        .map((s) => ({ group, start: hm(s.startTime), end: hm(s.endTime) })),
-    )
-    .sort(
-      (a, b) =>
-        a.start.localeCompare(b.start) ||
-        a.end.localeCompare(b.end) ||
-        a.group.name.localeCompare(b.group.name),
-    );
-  const scheduledIds = new Set(sessions.map((s) => s.group.id));
+  // ---- The day's sessions, already in time order (a group with two slots
+  // shows twice; both open the same checklist) ----
+  const entries: Entry[] = agenda.entries.map((e) => ({
+    ...e,
+    start: hm(e.startTime),
+    end: hm(e.endTime),
+  }));
+  const onAgenda = new Set(entries.map((e) => e.groupId));
   const others = groups
-    .filter((g) => !scheduledIds.has(g.id))
+    .filter((g) => !onAgenda.has(g.id))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  const nowIdx = sessions.findIndex((s) => s.start <= now && now < s.end);
-  const nextIdx = sessions.findIndex((s) => s.start > now);
+  // Postponed / cancelled entries are never "now" or "next".
+  const live = (e: Entry) => e.kind !== "postponed" && !e.cancelled;
+  const nowIdx = isToday ? entries.findIndex((e) => live(e) && e.start <= now && now < e.end) : -1;
+  const nextIdx = isToday ? entries.findIndex((e) => live(e) && e.start > now) : -1;
 
-  // ---- Selection: ?group (and ?at for a group with two slots), else the
-  // current or next session, else the first one, else the first other group ----
-  const pickSlot = (list: Session[]) =>
-    list.find((s) => s.end > now) ?? list[0];
+  // ---- Selection: ?session (a moved-in session), ?group (+ ?at for a group
+  // with two slots), else the current or next session, else the first one,
+  // else the first other group ----
+  const pickSlot = (list: Entry[]) =>
+    (isToday ? list.find((e) => e.kind !== "postponed" && e.end > now) : undefined) ??
+    list.find((e) => e.kind !== "postponed") ??
+    list[0];
 
-  const requested = groups.find((g) => g.id === groupParam);
-  let selectedGroup: GroupWithCount;
-  let selectedSession: Session | undefined;
-  if (requested) {
-    const own = sessions.filter((s) => s.group.id === requested.id);
-    const at = atParam ? hm(atParam) : null;
-    selectedGroup = requested;
-    selectedSession = own.find((s) => s.start === at) ?? pickSlot(own);
-  } else {
-    selectedSession = pickSlot(sessions);
-    selectedGroup = selectedSession?.group ?? others[0];
+  let selected: Entry | undefined;
+  let selectedGroupId: string | undefined;
+  if (sessionParam) {
+    selected = entries.find((e) => e.kind === "moved-in" && e.sessionId === sessionParam);
   }
+  if (!selected && groupParam) {
+    const own = entries.filter((e) => e.groupId === groupParam && e.kind !== "moved-in");
+    const at = atParam ? hm(atParam) : null;
+    selected =
+      own.find((e) => e.start === at) ??
+      pickSlot(own) ??
+      entries.find((e) => e.groupId === groupParam && e.kind === "moved-in");
+    if (!selected && groups.some((g) => g.id === groupParam)) selectedGroupId = groupParam;
+  }
+  if (!selected && !selectedGroupId) selected = pickSlot(entries);
+  if (selected) selectedGroupId = selected.groupId;
+  selectedGroupId ??= others[0]?.id;
+  const selectedGroup = groups.find((g) => g.id === selectedGroupId);
 
-  // ---- Which checklists are already saved today ----
-  // The overview knows each group's last saved checklist this month; today's
-  // groups and the selected one are read directly so the list can show "12/15".
-  const savedToday = overview.groups
-    .filter((g) => g.lastSessionDate?.slice(0, 10) === today)
-    .map((g) => g.groupId);
-  const toLoad = new Set([...savedToday, ...scheduledIds, selectedGroup.id]);
-  const days = new Map<string, SheetChecklist | null>(
-    await Promise.all(
-      [...toLoad].map(
-        async (id) =>
-          [id, await attendanceApi.day(id, today).catch(() => null)] as const,
-      ),
-    ),
-  );
-  const savedFor = (id: string) => {
-    const d = days.get(id);
-    return d && !d.isNew && !d.cancelled
-      ? { present: d.presentCount, total: d.students.length }
-      : null;
-  };
-  const cancelledFor = (id: string) => days.get(id)?.cancelled ?? false;
+  // ---- Checklists: the selected one, plus the other groups' (to show a
+  // checklist someone took on an unscheduled day) ----
+  const loadDay = (groupId: string) =>
+    attendanceApi.day(groupId, date).catch(() => null) as Promise<SheetChecklist | null>;
+  const selectedIsOther = !selected && others.some((g) => g.id === selectedGroupId);
+  const [loaded, otherDays] = await Promise.all([
+    selected?.kind === "moved-in" && selected.sessionId
+      ? (attendanceApi.session(selected.sessionId).catch(() => null) as Promise<SheetChecklist | null>)
+      : selectedGroupId && !selectedIsOther
+        ? loadDay(selectedGroupId)
+        : Promise.resolve(null),
+    Promise.all(others.map(async (g) => [g.id, await loadDay(g.id)] as const)),
+  ]);
+  const otherDay = new Map(otherDays);
+  const checklist =
+    loaded ?? (selectedIsOther && selectedGroupId ? (otherDay.get(selectedGroupId) ?? null) : null);
 
-  const sessionEntries: PickerEntry[] = sessions.map((s, i) => ({
-    key: `${s.group.id}@${s.start}`,
-    groupId: s.group.id,
-    groupName: s.group.name,
-    start: s.start,
-    end: s.end,
+  const movedLabel = (d: string) => `${weekdayShort(d, locale)} ${shortDate(d, locale)}`;
+
+  const sessionEntries: PickerEntry[] = entries.map((e, i) => ({
+    key: `${e.kind}:${e.kind === "moved-in" ? e.sessionId : e.groupId}@${e.start}`,
+    groupId: e.groupId,
+    groupName: e.groupName,
+    start: e.start || undefined,
+    end: e.end || undefined,
+    kind: e.kind,
+    retimed: e.retimed,
+    movedTo: e.movedTo
+      ? { day: movedLabel(e.movedTo.date), time: hm(e.movedTo.startTime) || undefined }
+      : undefined,
+    movedFrom: e.kind === "moved-in" && e.originalDate ? movedLabel(e.originalDate) : undefined,
     status: i === nowIdx ? "now" : i === nextIdx ? "next" : undefined,
-    saved: savedFor(s.group.id),
-    cancelled: cancelledFor(s.group.id),
-    href: todayHref(s.group.id, s.start),
-    selected: s === selectedSession,
+    saved:
+      e.saved && !e.cancelled && e.kind !== "postponed"
+        ? { present: e.presentCount, total: e.totalCount }
+        : null,
+    cancelled: e.cancelled,
+    href:
+      e.kind === "moved-in" && e.sessionId
+        ? todayHref(date, { session: e.sessionId })
+        : todayHref(date, { group: e.groupId, at: e.start || undefined }),
+    selected: e === selected,
   }));
-  const otherEntries: PickerEntry[] = others.map((g) => ({
-    key: g.id,
-    groupId: g.id,
-    groupName: g.name,
-    saved: savedFor(g.id),
-    cancelled: cancelledFor(g.id),
-    href: todayHref(g.id),
-    selected: g.id === selectedGroup.id,
-  }));
+  const otherEntries: PickerEntry[] = others.map((g) => {
+    const d = otherDay.get(g.id);
+    return {
+      key: g.id,
+      groupId: g.id,
+      groupName: g.name,
+      saved:
+        d && !d.isNew && !d.cancelled
+          ? { present: d.presentCount, total: d.students.length }
+          : null,
+      cancelled: d?.cancelled ?? false,
+      href: todayHref(date, { group: g.id }),
+      selected: !selected && g.id === selectedGroupId,
+    };
+  });
 
-  const checklist = days.get(selectedGroup.id) ?? null;
+  const dateText = dayLabel(date, locale);
+
+  // ---- The panel ----
+  const groupName = checklist?.group.name ?? selected?.groupName ?? selectedGroup?.name ?? "";
+  const coachName =
+    checklist?.group.coachName ?? selected?.coachName ?? selectedGroup?.coachName ?? null;
+  const originalDate = checklist ? isoDay(checklist.originalDate ?? checklist.date) : date;
+  // Moved away from this day: a calm banner instead of a register. A session
+  // opened by id (moved-in) is always shown as a register.
+  const movedAway =
+    selected?.kind === "postponed" ||
+    (!!checklist &&
+      selected?.kind !== "moved-in" &&
+      checklist.postponed &&
+      isoDay(checklist.actualDate) !== date);
+  const movedTo =
+    selected?.movedTo ??
+    (checklist && movedAway
+      ? { date: checklist.actualDate, startTime: checklist.startTime, endTime: checklist.endTime }
+      : null);
+  // Where / when it happens. A moved session shows its new day and times; a
+  // group with two slots today shows the slot that was picked.
+  const actualDay = checklist ? isoDay(checklist.actualDate ?? checklist.date) : date;
+  const slotTimes =
+    selected && selected.kind === "regular" && !selected.retimed
+      ? { startTime: selected.startTime, endTime: selected.endTime }
+      : null;
+  const actual = {
+    date: actualDay,
+    startTime:
+      (checklist?.rescheduled ? checklist.startTime : slotTimes?.startTime) ??
+      checklist?.startTime ??
+      selected?.startTime ??
+      null,
+    endTime:
+      (checklist?.rescheduled ? checklist.endTime : slotTimes?.endTime) ??
+      checklist?.endTime ??
+      selected?.endTime ??
+      null,
+  };
+  const movedFrom =
+    checklist?.rescheduled && !movedAway
+      ? {
+          date: checklist.originalDate,
+          startTime: checklist.originalStart,
+          endTime: checklist.originalEnd,
+        }
+      : null;
+
+  const afterMoveHref = selectedGroupId
+    ? selected?.kind === "moved-in" && selected.sessionId
+      ? todayHref(date, { group: selectedGroupId })
+      : todayHref(date, { group: selectedGroupId, at: selected?.start || undefined })
+    : undefined;
+
+  const prev = addDays(date, -1);
+  const next = addDays(date, 1);
 
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start lg:gap-6 xl:grid-cols-[19rem_minmax(0,1fr)]">
-      <SessionPicker sessions={sessionEntries} others={otherEntries} dateLabel={dateLabel} />
+    <div className="space-y-4">
+      {/* Day switcher: open the day a session was moved to, or catch up on yesterday. */}
+      <nav
+        aria-label={t("attendance.day.nav")}
+        className="flex flex-wrap items-center gap-2"
+      >
+        <Button asChild variant="outline" size="icon">
+          <GuardedLink href={todayHref(prev)} aria-label={t("attendance.day.prev")} title={t("attendance.day.prev")}>
+            <ChevronLeft aria-hidden className="rtl:rotate-180" />
+          </GuardedLink>
+        </Button>
+        <p className="min-w-0 px-1 text-sm font-semibold" aria-live="polite">
+          {dateText}
+        </p>
+        <Button asChild variant="outline" size="icon">
+          <GuardedLink href={todayHref(next)} aria-label={t("attendance.day.next")} title={t("attendance.day.next")}>
+            <ChevronRight aria-hidden className="rtl:rotate-180" />
+          </GuardedLink>
+        </Button>
+        {!isToday && (
+          <Button asChild variant="ghost" size="sm">
+            <GuardedLink href={todayHref(today)}>
+              <CalendarCheck />
+              {t("attendance.day.today")}
+            </GuardedLink>
+          </Button>
+        )}
+      </nav>
 
-      <Card>
-        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0 p-4 pb-3 sm:p-6 sm:pb-4">
-          <div className="min-w-0 space-y-1">
-            <h2 className="text-xl font-bold tracking-tight">
-              {t("attendance.today.panelTitle", { group: selectedGroup.name })}
-            </h2>
-            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-              <span>
-                {t("attendance.today.session")}:{" "}
-                <span className="font-medium text-foreground">{selectedGroup.name}</span>
-              </span>
-              <span aria-hidden className="h-4 w-px bg-border" />
-              <span>
-                {t("attendance.today.time")}:{" "}
-                {selectedSession ? (
-                  <bdi dir="ltr" className="font-medium tabular-nums text-foreground">
-                    {selectedSession.start}–{selectedSession.end}
-                  </bdi>
-                ) : (
-                  <span className="font-medium text-foreground">
-                    {t("attendance.today.noSlot")}
-                  </span>
-                )}
-              </span>
-              {selectedGroup.coachName && (
-                <>
-                  <span aria-hidden className="h-4 w-px bg-border" />
-                  <span>{selectedGroup.coachName}</span>
-                </>
-              )}
-            </p>
-          </div>
-          {checklist && !checklist.cancelled && (
-            <CancelSessionButton
-              groupId={selectedGroup.id}
-              groupName={selectedGroup.name}
-              date={today}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[17rem_minmax(0,1fr)] lg:items-start lg:gap-6 xl:grid-cols-[19rem_minmax(0,1fr)]">
+        <SessionPicker
+          sessions={sessionEntries}
+          others={otherEntries}
+          dateLabel={dateText}
+          isToday={isToday}
+          dateShort={shortDate(date, locale)}
+        />
+
+        <Card>
+          {selectedGroupId && (
+            <SessionPanelHeader
+              groupName={groupName}
+              coachName={coachName}
+              actual={
+                movedAway
+                  ? {
+                      date,
+                      startTime: checklist?.originalStart ?? selected?.startTime ?? null,
+                      endTime: checklist?.originalEnd ?? selected?.endTime ?? null,
+                    }
+                  : actual
+              }
+              movedFrom={movedFrom}
+              noSlotLabel={isToday ? t("attendance.today.noSlot") : t("attendance.today.noSlotDay")}
+              actions={
+                checklist && !checklist.cancelled ? (
+                  <>
+                    {/* First, so it stays mounted (and its success step open)
+                        when the panel re-renders after the move. */}
+                    <RescheduleSessionButton
+                      groupId={checklist.groupId}
+                      groupName={groupName}
+                      originalDate={originalDate}
+                      current={actual}
+                      afterMoveHref={afterMoveHref}
+                    />
+                    {!movedAway && (
+                      <CancelSessionButton
+                        groupId={checklist.groupId}
+                        groupName={groupName}
+                        date={originalDate}
+                        displayDate={actualDay}
+                      />
+                    )}
+                  </>
+                ) : null
+              }
             />
           )}
-        </CardHeader>
-        <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-          {checklist?.cancelled ? (
-            <CancelledBanner
-              groupId={selectedGroup.id}
-              groupName={selectedGroup.name}
-              date={today}
-              reason={checklist.cancelReason}
-              isToday
-              trialsCount={checklist.trials?.length ?? 0}
-            />
-          ) : checklist ? (
-            <>
-              <AttendanceSheet
-                key={`${selectedGroup.id}:${today}`}
-                checklist={checklist}
-                mode="day"
+          <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+            {checklist && movedAway && movedTo ? (
+              <PostponedBanner
+                groupId={checklist.groupId}
+                originalDate={originalDate}
+                movedTo={movedTo}
+                // ?session finds the moved-in entry there; ?group is the fallback.
+                openHref={todayHref(movedTo.date, {
+                  session: checklist.id ?? selected?.sessionId ?? undefined,
+                  group: checklist.groupId,
+                })}
               />
-              <TrialsToday trials={checklist.trials ?? []} />
-            </>
-          ) : (
-            <div className="flex items-center gap-3 rounded-lg border border-alert/30 bg-alert/5 p-4 text-sm">
-              <CircleAlert aria-hidden className="size-5 shrink-0 text-alert" />
-              {t("attendance.today.groupMissing")}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            ) : checklist?.cancelled ? (
+              <CancelledBanner
+                groupId={checklist.groupId}
+                groupName={groupName}
+                date={originalDate}
+                displayDate={actualDay}
+                reason={checklist.cancelReason}
+                isToday={actualDay === today}
+                trialsCount={checklist.trials?.length ?? 0}
+              />
+            ) : checklist ? (
+              <>
+                <AttendanceSheet
+                  key={`${checklist.groupId}:${originalDate}`}
+                  checklist={checklist}
+                  mode="day"
+                />
+                <TrialsToday trials={checklist.trials ?? []} />
+              </>
+            ) : (
+              <div className="flex items-center gap-3 rounded-lg border border-alert/30 bg-alert/5 p-4 text-sm">
+                <CircleAlert aria-hidden className="size-5 shrink-0 text-alert" />
+                {t("attendance.today.groupMissing")}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

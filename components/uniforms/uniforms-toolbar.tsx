@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, Trash2, X } from "lucide-react";
+import { ClipboardList, Loader2, Search, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,8 @@ export function UniformsToolbar({
   selectedCount,
   onClearSelection,
   onBulkDelete,
+  onPrepareOrder,
+  preparePending = false,
 }: {
   q: string;
   onSearch: (q: string) => void;
@@ -38,6 +40,9 @@ export function UniformsToolbar({
   selectedCount: number;
   onClearSelection: () => void;
   onBulkDelete: () => void;
+  /** «تجهيز طلبية للمورّد» for the selected requests. */
+  onPrepareOrder: () => void;
+  preparePending?: boolean;
 }) {
   const t = useT();
 
@@ -109,7 +114,7 @@ export function UniformsToolbar({
       )}
 
       {selectedCount > 0 && (
-        <div className="flex items-center gap-1 sm:ms-auto">
+        <div className="flex w-full flex-wrap items-center gap-1 sm:ms-auto sm:w-auto">
           <span className="px-1 text-sm text-muted-foreground">
             {t("uniforms.bulkDelete.selected", { count: selectedCount })}
           </span>
@@ -120,6 +125,20 @@ export function UniformsToolbar({
             onClick={onClearSelection}
           >
             {t("common.clear")}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10 sm:h-8"
+            onClick={onPrepareOrder}
+            disabled={preparePending}
+          >
+            {preparePending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <ClipboardList className="size-4" />
+            )}
+            {t("uniforms.supplier.prepare.btn")}
           </Button>
           <Button
             variant="destructive"

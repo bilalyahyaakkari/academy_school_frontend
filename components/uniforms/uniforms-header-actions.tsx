@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { MoreHorizontal, Plus, Upload, Users } from "lucide-react";
+import { MoreHorizontal, Plus, Truck, Upload, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -39,7 +39,13 @@ export function UniformsHeaderActions({
             {t("uniforms.action.more")}
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem asChild className="min-h-10 cursor-pointer sm:min-h-0">
+            <Link href="/uniforms/orders">
+              <Truck className="me-2 size-4" />
+              {t("uniforms.orders.menu")}
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuItem asChild className="min-h-10 cursor-pointer sm:min-h-0">
             <Link href="/uniforms/bulk">
               <Users className="me-2 size-4" />

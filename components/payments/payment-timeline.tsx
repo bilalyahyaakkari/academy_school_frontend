@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useLocale, useT } from "@/lib/i18n/client";
 import { monthLabelI18n, type TranslationKey } from "@/lib/i18n";
-import { CheckCircle2, Circle, AlertCircle } from "lucide-react";
+import { CheckCircle2, Circle, AlertCircle, Lock } from "lucide-react";
 
 type TimelinePayment = {
   id: string;
@@ -18,6 +18,10 @@ type TimelinePayment = {
   paymentMethod: "CASH" | "BANK_TRANSFER" | "OTHER" | null;
   paymentDate: string | null;
   notes: string | null;
+  /** How a fixed amount was worked out (e.g. a prorated first month). */
+  pricingNote?: string | null;
+  /** Amount fixed by hand: never re-priced automatically. */
+  locked?: boolean;
   /**
    * Ignored — the period is labelled from `month`/`year` in the viewer's
    * locale. Kept optional so existing callers still typecheck.
@@ -83,6 +87,21 @@ export function PaymentTimeline({ payments }: { payments: TimelinePayment[] }) {
                 {(p.discount ?? 0) > 0 && (
                   <p className="text-[11px] text-muted-foreground">
                     {t("payments.discount.note", { amount: formatCurrency(p.discount ?? 0) })}
+                  </p>
+                )}
+                {(p.locked || p.pricingNote) && (
+                  <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                    {p.locked && (
+                      <Badge
+                        variant="soft"
+                        className="gap-1 px-1.5 py-0 text-[11px]"
+                        title={t("students.payment.fixed.title")}
+                      >
+                        <Lock aria-hidden className="size-3" />
+                        {t("students.payment.fixed")}
+                      </Badge>
+                    )}
+                    {p.pricingNote && <span>{p.pricingNote}</span>}
                   </p>
                 )}
                 {p.notes && <p className="mt-1 text-xs italic text-muted-foreground">{p.notes}</p>}

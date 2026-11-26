@@ -6,6 +6,7 @@ import { studentsApi } from "@/lib/api/students";
 import { ApiError } from "@/lib/api/client";
 import { getT } from "@/lib/i18n/server";
 import type { TranslationKey } from "@/lib/i18n";
+import type { FirstMonthChoice, FirstMonthQuote } from "@/lib/api/types";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -46,7 +47,26 @@ function buildPayload(formData: FormData) {
     groupId: groupId || null,
     monthlyFee: feeStr === "" ? null : Number(feeStr),
     notes: str("notes") || undefined,
+    // Omitted when blank: the backend defaults a new student to today and
+    // leaves an existing student's date alone.
+    trainingStartDate: /^\d{4}-\d{2}-\d{2}$/.test(str("trainingStartDate"))
+      ? str("trainingStartDate")
+      : undefined,
   };
+}
+
+/**
+ * Reads the first-month choice posted by <FirstMonthFee> (hidden inputs
+ * `firstMonthMode` / `firstMonthAmount`). FULL (or nothing) → undefined, so
+ * the month is billed normally; an unusable amount → "invalid".
+ */
+function readFirstMonth(formData: FormData): FirstMonthChoice | undefined | "invalid" {
+  const mode = String(formData.get("firstMonthMode") ?? "").trim();
+  if (mode !== "PRORATED" && mode !== "MANUAL") return undefined;
+  const raw = String(formData.get("firstMonthAmount") ?? "").trim();
+  const amount = Number(raw);
+  if (raw === "" || !Number.isFinite(amount) || amount < 0 || amount > 1_000_000) return "invalid";
+  return { mode, amount: Math.round(amount * 100) / 100 };
 }
 
 async function errorMessage(err: unknown, fallback: TranslationKey): Promise<string> {
@@ -56,9 +76,14 @@ async function errorMessage(err: unknown, fallback: TranslationKey): Promise<str
 }
 
 export async function createStudent(formData: FormData): Promise<ActionResult> {
+  const firstMonth = readFirstMonth(formData);
+  if (firstMonth === "invalid") {
+    const t = await getT();
+    return { success: false, error: t("firstMonth.error.amount") };
+  }
   let createdId: string | undefined;
   try {
-    const created = await studentsApi.create(buildPayload(formData));
+    const created = await studentsApi.create({ ...buildPayload(formData), firstMonth });
     createdId = created.id;
   } catch (err) {
     return { success: false, error: await errorMessage(err, "students.error.create") };
@@ -66,6 +91,8 @@ export async function createStudent(formData: FormData): Promise<ActionResult> {
   revalidatePath("/students");
   revalidatePath("/dashboard");
   revalidatePath("/roster");
+  // A prorated / custom first month creates that month's invoice right away.
+  revalidatePath("/payments", "layout");
   redirect(`/students/${createdId}`);
 }
 
@@ -82,6 +109,31 @@ export async function updateStudent(id: string, formData: FormData): Promise<Act
   revalidatePath("/payments");
   revalidatePath("/payments/outstanding");
   redirect(`/students/${id}`);
+}
+
+/**
+ * What the first month would cost for a start date (mid-month proration).
+ * Used by the student form and the trial "Join as student" dialog.
+ */
+export async function getFirstMonthQuote(q: {
+  startDate: string;
+  groupId?: string | null;
+  monthlyFee?: number | null;
+}): Promise<{ success: true; quote: FirstMonthQuote } | { success: false; error: string }> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(q.startDate)) {
+    const t = await getT();
+    return { success: false, error: t("firstMonth.error.quote") };
+  }
+  try {
+    const quote = await studentsApi.firstMonthQuote({
+      startDate: q.startDate,
+      groupId: q.groupId || undefined,
+      monthlyFee: q.monthlyFee != null && Number.isFinite(q.monthlyFee) ? q.monthlyFee : undefined,
+    });
+    return { success: true, quote };
+  } catch (err) {
+    return { success: false, error: await errorMessage(err, "firstMonth.error.quote") };
+  }
 }
 
 export async function deleteStudent(id: string): Promise<ActionResult> {

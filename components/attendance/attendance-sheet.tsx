@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -25,8 +25,11 @@ import {
 } from "@/components/ui/dialog";
 import { PresenceRadio, type Mark } from "./presence-radio";
 import { useUnsavedChanges } from "./unsaved-guard";
+import { AddGuestButton } from "./guest-picker";
+import { isoDay } from "./session-dates";
 import {
   deleteChecklist,
+  removeGuest,
   saveChecklist,
   saveDayAttendance,
 } from "@/lib/actions/attendance";
@@ -34,12 +37,22 @@ import type { AttendanceChecklist } from "@/lib/api/types";
 import { cn, formatDateOnly } from "@/lib/utils";
 import { useLocale, useT } from "@/lib/i18n/client";
 import { toast } from "sonner";
-import { CheckCheck, Info, Loader2, Save, Trash2, UsersRound, X } from "lucide-react";
+import { CheckCheck, Info, Loader2, Save, Trash2, UserRoundPlus, UsersRound, X } from "lucide-react";
 
 /** A checklist as the Today screen gets it: `id` is null until the first save. */
 export type SheetChecklist = Omit<AttendanceChecklist, "id"> & { id: string | null };
 
 type Marks = Record<string, Mark | undefined>;
+type SheetStudent = SheetChecklist["students"][number];
+
+/**
+ * A row's starting mark. A never-saved checklist starts unmarked — except
+ * guests, who are stored (present) the moment they're added.
+ */
+function initialMark(s: SheetStudent, isNew: boolean): Mark | undefined {
+  if (isNew && !s.isGuest) return undefined;
+  return s.present ? "present" : "absent";
+}
 
 /**
  * The Present / Absent register for one group on one day — used by the Today
@@ -51,6 +64,9 @@ type Marks = Record<string, Mark | undefined>;
  *
  * A checklist that has never been saved starts with every row unmarked;
  * whatever is still unmarked on save is recorded as absent.
+ *
+ * Guests (players from other groups, this session only) are listed after the
+ * group's own players, saved with the same records, and can be removed.
  */
 export function AttendanceSheet({
   checklist,
@@ -62,14 +78,16 @@ export function AttendanceSheet({
   const t = useT();
   const locale = useLocale();
   const router = useRouter();
-  const students = checklist.students;
+  const originalDate = isoDay(checklist.originalDate ?? checklist.date);
+  // Local copy: adding / removing a guest updates the rows without a reload,
+  // so unsaved marks on the other rows are kept.
+  const [students, setStudents] = useState<SheetStudent[]>(checklist.students);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [, startRemove] = useTransition();
 
   const [baseline, setBaseline] = useState<Marks>(() =>
     Object.fromEntries(
-      students.map((s) => [
-        s.studentId,
-        checklist.isNew ? undefined : s.present ? "present" : "absent",
-      ]),
+      checklist.students.map((s) => [s.studentId, initialMark(s, checklist.isNew)]),
     ),
   );
   const [marks, setMarks] = useState<Marks>(baseline);
@@ -81,6 +99,8 @@ export function AttendanceSheet({
   const [saving, startSave] = useTransition();
   const [deleting, startDelete] = useTransition();
 
+  const guestCount = students.filter((s) => s.isGuest).length;
+  const firstGuestIdx = students.findIndex((s) => s.isGuest);
   const presentCount = students.filter((s) => marks[s.studentId] === "present").length;
   const absentCount = students.filter((s) => marks[s.studentId] === "absent").length;
   const unmarkedCount = students.length - presentCount - absentCount;
@@ -146,6 +166,53 @@ export function AttendanceSheet({
     });
   };
 
+  /** A guest was added: take the new rows, keep the marks already made. */
+  const onGuestAdded = (updated: SheetChecklist) => {
+    const known = new Set(students.map((s) => s.studentId));
+    const fresh = updated.students.filter((s) => !known.has(s.studentId));
+    const freshMarks: Marks = Object.fromEntries(
+      fresh.map((s) => [s.studentId, s.present ? "present" : "absent"]),
+    );
+    // Server order: the group's own players, then guests.
+    const byId = new Map(students.map((s) => [s.studentId, s]));
+    setStudents(updated.students.map((s) => byId.get(s.studentId) ?? s));
+    setMarks((prev) => ({ ...prev, ...freshMarks }));
+    setBaseline((prev) => ({ ...prev, ...freshMarks }));
+    if (updated.id) setSessionId(updated.id);
+    // The server action already refreshed the page (counts in the session list).
+  };
+
+  const onRemoveGuest = (s: SheetStudent) => {
+    if (!sessionId) return;
+    setRemovingId(s.studentId);
+    startRemove(async () => {
+      const res = await removeGuest(sessionId, checklist.groupId, s.studentId);
+      setRemovingId(null);
+      if (res.success === false) {
+        toast.error(res.error);
+        return;
+      }
+      const drop = <T,>(m: Record<string, T>) => {
+        const next = { ...m };
+        delete next[s.studentId];
+        return next;
+      };
+      setStudents((prev) => prev.filter((x) => x.studentId !== s.studentId));
+      setMarks(drop);
+      setBaseline(drop);
+      toast.success(t("attendance.guest.removed", { name: s.fullName }));
+    });
+  };
+
+  const addGuestButton = (
+    <AddGuestButton
+      groupId={checklist.groupId}
+      originalDate={originalDate}
+      disabled={saving}
+      onAdded={onGuestAdded}
+    />
+  );
+
   const onDelete = () => {
     if (!sessionId) return;
     startDelete(async () => {
@@ -164,11 +231,14 @@ export function AttendanceSheet({
         </div>
         <p className="font-medium">{t("attendance.checklist.empty")}</p>
         <p className="text-sm text-muted-foreground">{t("attendance.checklist.emptySub")}</p>
-        <Button asChild variant="outline" className="mt-2">
-          <Link href={`/roster?year=${checklist.year}&month=${checklist.month}`}>
-            {t("nav.roster")}
-          </Link>
-        </Button>
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+          <Button asChild variant="outline">
+            <Link href={`/roster?year=${checklist.year}&month=${checklist.month}`}>
+              {t("nav.roster")}
+            </Link>
+          </Button>
+          {addGuestButton}
+        </div>
       </div>
     );
   }
@@ -188,6 +258,14 @@ export function AttendanceSheet({
             <Badge variant={unmarkedCount > 0 ? "warning" : "outline"}>
               {t("attendance.sheet.count.unmarked", { count: unmarkedCount })}
             </Badge>
+            {guestCount > 0 && (
+              <Badge variant="outline" className="gap-1 text-muted-foreground">
+                <UserRoundPlus aria-hidden className="size-3" />
+                {guestCount === 1
+                  ? t("attendance.guest.count.one")
+                  : t("attendance.guest.count", { count: guestCount })}
+              </Badge>
+            )}
             {isNew ? (
               <Badge variant="outline" className="text-muted-foreground">
                 {t("attendance.checklist.unsaved")}
@@ -245,37 +323,79 @@ export function AttendanceSheet({
             {students.map((s, i) => {
               const nameId = `att-name-${s.studentId}`;
               return (
-                <TableRow key={s.studentId}>
-                  <TableCell className="ps-3 text-center tabular-nums text-muted-foreground sm:ps-4">
-                    {i + 1}
-                  </TableCell>
-                  <TableCell className="py-2.5">
-                    <span id={nameId} className="block font-medium leading-snug">
-                      {s.fullName}
-                    </span>
-                    {s.phoneNumber && (
-                      <span className="block text-xs text-muted-foreground">
-                        <span dir="ltr">{s.phoneNumber}</span>
+                <Fragment key={s.studentId}>
+                  {i === firstGuestIdx && (
+                    // Guests are existing players from other groups — kept
+                    // apart from the group's own list (and from trials).
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableCell colSpan={3} className="px-3 py-2 sm:px-4">
+                        <span className="flex items-center gap-1.5 text-xs font-semibold text-secondary-foreground">
+                          <UserRoundPlus aria-hidden className="size-3.5" />
+                          {t("attendance.guest.section")}
+                        </span>
+                        <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                          {t("attendance.guest.sectionHint")}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  <TableRow className={cn(s.isGuest && "bg-sea-100/30 dark:bg-sea-900/20")}>
+                    <TableCell className="ps-3 text-center tabular-nums text-muted-foreground sm:ps-4">
+                      {i + 1}
+                    </TableCell>
+                    <TableCell className="py-2.5">
+                      <span id={nameId} className="block font-medium leading-snug">
+                        {s.fullName}
                       </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap py-2 pe-3 sm:pe-4">
-                    <PresenceRadio
-                      name={`att-${s.studentId}`}
-                      labelledBy={nameId}
-                      value={marks[s.studentId]}
-                      disabled={saving}
-                      onChange={(value) =>
-                        setMarks((prev) => ({ ...prev, [s.studentId]: value }))
-                      }
-                    />
-                  </TableCell>
-                </TableRow>
+                      {s.isGuest && (
+                        <span className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                          <Badge variant="soft" className="px-1.5 py-0">
+                            {t("attendance.guest.badge")}
+                          </Badge>
+                          {s.homeGroup && (
+                            <span className="text-xs text-muted-foreground">
+                              {t("attendance.guest.from", { group: s.homeGroup.name })}
+                            </span>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="-my-1.5 size-9 text-destructive hover:bg-destructive/10 hover:text-destructive sm:size-8"
+                            aria-label={t("attendance.guest.remove", { name: s.fullName })}
+                            title={t("attendance.guest.remove", { name: s.fullName })}
+                            onClick={() => onRemoveGuest(s)}
+                            disabled={saving || removingId === s.studentId || !sessionId}
+                          >
+                            {removingId === s.studentId ? <Loader2 className="animate-spin" /> : <X />}
+                          </Button>
+                        </span>
+                      )}
+                      {s.phoneNumber && (
+                        <span className="block text-xs text-muted-foreground">
+                          <span dir="ltr">{s.phoneNumber}</span>
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap py-2 pe-3 sm:pe-4">
+                      <PresenceRadio
+                        name={`att-${s.studentId}`}
+                        labelledBy={nameId}
+                        value={marks[s.studentId]}
+                        disabled={saving || removingId === s.studentId}
+                        onChange={(value) =>
+                          setMarks((prev) => ({ ...prev, [s.studentId]: value }))
+                        }
+                      />
+                    </TableCell>
+                  </TableRow>
+                </Fragment>
               );
             })}
           </TableBody>
         </Table>
       </div>
+
+      <div className="flex flex-wrap items-center gap-2">{addGuestButton}</div>
 
       <div className="space-y-2">
         <Label htmlFor={`att-notes-${checklist.groupId}`}>

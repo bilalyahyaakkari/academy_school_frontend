@@ -1,11 +1,12 @@
 import { PageHeader } from "@/components/app/page-header";
 import { AttendanceTabs, type AttendanceTab } from "@/components/attendance/attendance-tabs";
-import { TodayView, academyWeekday } from "@/components/attendance/today-view";
+import { TodayView } from "@/components/attendance/today-view";
+import { isIsoDay, weekdayKey } from "@/components/attendance/session-dates";
 import { HistoryView } from "@/components/attendance/history-view";
 import { UnsavedChangesProvider } from "@/components/attendance/unsaved-guard";
 import { formatDateOnly, resolveYearMonth, todayIso } from "@/lib/utils";
 import { getT, getLocale } from "@/lib/i18n/server";
-import { monthLabelI18n, type TranslationKey } from "@/lib/i18n";
+import { monthLabelI18n } from "@/lib/i18n";
 
 export async function generateMetadata() {
   const t = await getT();
@@ -16,6 +17,8 @@ type SearchParams = Promise<{
   tab?: string | string[];
   group?: string | string[];
   at?: string | string[];
+  session?: string | string[];
+  date?: string | string[];
   year?: string | string[];
   month?: string | string[];
 }>;
@@ -24,6 +27,8 @@ const one = (v?: string | string[]) => (Array.isArray(v) ? v[0] : v);
 
 /**
  * /attendance?tab=today&group=<id>   take today's attendance (default)
+ * /attendance?tab=today&date=YYYY-MM-DD   another day (e.g. where a session was moved)
+ * /attendance?tab=today&session=<id>   a session moved onto that day
  * /attendance?tab=history&year=&month=   month overview
  *
  * A bare ?year=&month= (what MonthPicker and older links produce) also means
@@ -42,7 +47,9 @@ export default async function AttendancePage({ searchParams }: { searchParams: S
 
   const t = await getT();
   const locale = await getLocale();
-  const dateLabel = `${t(`day.${academyWeekday()}` as TranslationKey)} · ${formatDateOnly(todayIso(), locale)}`;
+  // The Today tab's day: ?date=YYYY-MM-DD, else today in Beirut.
+  const dateParam = one(sp.date);
+  const day = isIsoDay(dateParam) ? dateParam : todayIso();
 
   return (
     <UnsavedChangesProvider>
@@ -52,8 +59,8 @@ export default async function AttendancePage({ searchParams }: { searchParams: S
           description={
             tab === "today"
               ? t("attendance.today.desc", {
-                  weekday: t(`day.${academyWeekday()}` as TranslationKey),
-                  date: formatDateOnly(todayIso(), locale),
+                  weekday: t(weekdayKey(day)),
+                  date: formatDateOnly(day, locale),
                 })
               : t("attendance.history.desc", { month: monthLabelI18n(locale, month, year) })
           }
@@ -69,7 +76,12 @@ export default async function AttendancePage({ searchParams }: { searchParams: S
         />
 
         {tab === "today" ? (
-          <TodayView groupParam={one(sp.group)} atParam={one(sp.at)} dateLabel={dateLabel} />
+          <TodayView
+            date={day}
+            groupParam={one(sp.group)}
+            atParam={one(sp.at)}
+            sessionParam={one(sp.session)}
+          />
         ) : (
           <HistoryView year={year} month={month} />
         )}
