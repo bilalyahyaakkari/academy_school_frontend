@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { groupsApi } from "@/lib/api/groups";
+import { studentsApi } from "@/lib/api/students";
 import { ApiError } from "@/lib/api/client";
 import type { ScheduleSlot } from "@/lib/api/types";
+import { getT } from "@/lib/i18n/server";
+import type { TranslationKey } from "@/lib/i18n";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -45,7 +48,7 @@ export async function createGroup(formData: FormData): Promise<ActionResult> {
     const g = await groupsApi.create(buildPayload(formData));
     id = g.id;
   } catch (err) {
-    return errResult(err, "Failed to create group");
+    return errResult(err, "groups.error.create");
   }
   revalidatePath("/groups");
   redirect(`/groups/${id}`);
@@ -55,7 +58,7 @@ export async function updateGroup(id: string, formData: FormData): Promise<Actio
   try {
     await groupsApi.update(id, buildPayload(formData));
   } catch (err) {
-    return errResult(err, "Failed to update group");
+    return errResult(err, "groups.error.update");
   }
   revalidatePath("/groups");
   revalidatePath(`/groups/${id}`);
@@ -70,12 +73,40 @@ export async function deleteGroup(id: string): Promise<ActionResult> {
   try {
     await groupsApi.remove(id);
   } catch (err) {
-    return errResult(err, "Failed to delete group");
+    return errResult(err, "groups.error.delete");
   }
   revalidatePath("/groups");
   redirect("/groups");
 }
 
-function errResult(err: unknown, fallback: string): ActionResult {
-  return { success: false, error: err instanceof ApiError ? err.message : fallback };
+/**
+ * Moves a student to another group (null = no group). The backend also moves
+ * their unpaid invoices to the new fee and updates this month's roster group,
+ * so every page that shows groups, students, rosters, attendance or invoices
+ * is refreshed.
+ */
+export async function changeStudentGroup(
+  studentId: string,
+  groupId: string | null,
+): Promise<ActionResult> {
+  try {
+    await studentsApi.changeGroup(studentId, groupId);
+  } catch (err) {
+    return errResult(err, "groups.error.changeGroup");
+  }
+  // "layout" also refreshes the nested pages (/groups/[id], /students/[id], …).
+  revalidatePath("/groups", "layout");
+  revalidatePath("/students", "layout");
+  revalidatePath("/roster", "layout");
+  revalidatePath("/attendance", "layout");
+  revalidatePath("/payments", "layout");
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+/** API errors carry the backend's message (e.g. the 409 explaining why a group can't be deleted). */
+async function errResult(err: unknown, fallback: TranslationKey): Promise<ActionResult> {
+  if (err instanceof ApiError) return { success: false, error: err.message };
+  const t = await getT();
+  return { success: false, error: t(fallback) };
 }

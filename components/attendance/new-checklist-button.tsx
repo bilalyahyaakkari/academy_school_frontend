@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,10 +38,17 @@ export function NewChecklistButton({
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const [date, setDate] = useState(todayIso());
+  const [date, setDate] = useState(() => todayIso());
   const [pending, start] = useTransition();
+  const router = useRouter();
 
   const submit = () => {
+    // Today has its own screen, which doesn't create a checklist until saved.
+    if (date === todayIso()) {
+      setOpen(false);
+      router.push(`/attendance?tab=today&group=${encodeURIComponent(groupId)}`);
+      return;
+    }
     start(async () => {
       // On success this redirects, so anything returned here is an error.
       const res = await openChecklist(groupId, date);
@@ -49,10 +57,18 @@ export function NewChecklistButton({
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        // Re-read "today" on every open: a tab left open overnight would
+        // otherwise default to yesterday.
+        if (o) setDate(todayIso());
+        setOpen(o);
+      }}
+    >
       <DialogTrigger asChild>
         <Button variant={variant} className={className}>
-          <ClipboardCheck className="size-4" />
+          <ClipboardCheck />
           {label}
         </Button>
       </DialogTrigger>

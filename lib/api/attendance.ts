@@ -14,6 +14,35 @@ export const attendanceApi = {
       `/attendance/group/${groupId}?year=${year}&month=${month}`,
     ),
 
+  /**
+   * One group's checklist for a day WITHOUT creating it (`id` is null until the
+   * first save). Use this for the "Today" screen.
+   */
+  day: (groupId: string, date: string) =>
+    api.get<Omit<AttendanceChecklist, "id"> & { id: string | null }>(
+      `/attendance/day?groupId=${groupId}&date=${date}`,
+    ),
+
+  /** Save a group's checklist for a day; creates the session on first save. */
+  saveDay: (
+    groupId: string,
+    date: string,
+    records: { studentId: string; present: boolean }[],
+    notes?: string,
+  ) =>
+    api.put<{ id: string; saved: number; presentCount: number }>("/attendance/day", {
+      groupId,
+      date,
+      records,
+      notes,
+    }),
+
+  /** Cancel a group's session on a day (rain, holiday…). */
+  cancelDay: (groupId: string, date: string, reason?: string) =>
+    api.put<AttendanceChecklist>("/attendance/day/cancel", { groupId, date, reason }),
+  uncancelDay: (groupId: string, date: string) =>
+    api.put<AttendanceChecklist>("/attendance/day/uncancel", { groupId, date }),
+
   session: (id: string) => api.get<AttendanceChecklist>(`/attendance/session/${id}`),
 
   /** Idempotent: one checklist per group per day. */

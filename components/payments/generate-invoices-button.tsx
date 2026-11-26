@@ -26,11 +26,9 @@ export function GenerateInvoicesButton({
       const res = await generateMonthlyInvoices(year, month);
       if (res.success) {
         const created = res.data?.created ?? 0;
-        toast.success(
-          created === 1
-            ? t("payments.action.generate", { count: created })
-            : t("payments.action.generate.plural", { count: created }),
-        );
+        if (created === 0) toast.info(t("payments.generate.toast.none"));
+        else if (created === 1) toast.success(t("payments.generate.toast.created.one"));
+        else toast.success(t("payments.generate.toast.created", { count: created }));
       } else {
         toast.error(res.error);
       }

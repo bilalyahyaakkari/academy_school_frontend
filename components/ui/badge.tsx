@@ -13,6 +13,10 @@ const badgeVariants = cva(
         outline: "text-foreground",
         success: "border-transparent bg-success text-success-foreground",
         warning: "border-transparent bg-warning text-warning-foreground",
+        /** Soft tinted chip — neutral info (e.g. "Left", "New"). */
+        soft: "border-transparent bg-sea-100 text-sea-900",
+        /** Needs attention (unpaid, overdue). Red is reserved for this. */
+        alert: "border-transparent bg-alert/10 text-alert",
       },
     },
     defaultVariants: { variant: "default" },
@@ -20,9 +24,11 @@ const badgeVariants = cva(
 );
 
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends React.HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof badgeVariants> {}
 
 export function Badge({ className, variant, ...props }: BadgeProps) {
-  return <div className={cn(badgeVariants({ variant }), className)} {...props} />;
+  // A <span>: badges sit inline, often inside <p>, where a <div> is invalid
+  // HTML and causes a hydration error.
+  return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
 }

@@ -4,7 +4,10 @@ import { PageHeader } from "@/components/app/page-header";
 import { BulkOrderClient } from "@/components/uniforms/bulk-order-client";
 import { getT } from "@/lib/i18n/server";
 
-export const metadata = { title: "Bulk uniform order — Academy" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: `${t("uniforms.bulk.title")} — Academy` };
+}
 
 export default async function BulkUniformOrderPage() {
   const t = await getT();
@@ -43,7 +46,6 @@ export default async function BulkUniformOrderPage() {
         students={students.map((s) => ({
           id: s.id,
           fullName: s.fullName,
-          isActive: s.isActive,
           existingOrders: ordersByStudent.get(s.id) ?? 0,
         }))}
         knownSizes={knownSizes}

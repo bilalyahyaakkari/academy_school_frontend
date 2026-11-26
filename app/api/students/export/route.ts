@@ -2,12 +2,16 @@ import { NextRequest } from "next/server";
 import * as XLSX from "xlsx";
 import { auth } from "@/auth";
 import { studentsApi } from "@/lib/api/students";
+import { birthYear, currentYearMonth, todayIso } from "@/lib/utils";
 
 /**
- * GET /api/students/export?q=&groupId=&status=
+ * GET /api/students/export?q=&groupId=&archived=
  *
  * Returns a real .xlsx workbook of (optionally filtered) students.
  * Auth.js cookie carries the session, so a plain <a href> link works.
+ *
+ * Columns match the importer's, so an export can be edited and re-imported
+ * (the extra "Age" and "Left the academy" columns are ignored on import).
  */
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -17,32 +21,17 @@ export async function GET(request: NextRequest) {
 
   const sp = request.nextUrl.searchParams;
   const groupParam = sp.get("groupId") === "__none__" ? "none" : sp.get("groupId") || undefined;
-  const status = (sp.get("status") as "active" | "inactive" | null) || undefined;
   const q = sp.get("q") || undefined;
+  const archivedRaw = sp.get("archived");
   const archived =
-    (sp.get("archived") as "only" | "include" | null) || undefined;
+    archivedRaw === "only" || archivedRaw === "include" ? archivedRaw : undefined;
 
   const students = await studentsApi.list({
     q,
     groupId: groupParam,
-    status,
     archived,
   });
-  const currentYear = new Date().getFullYear();
-
-  const rows = students.map((s) => {
-    const year = new Date(s.dateOfBirth).getFullYear();
-    return {
-      "Full name": s.fullName,
-      "Year of birth": year,
-      Age: currentYear - year,
-      "Parent phone": s.phoneNumber ?? "",
-      Group: s.group?.name ?? "",
-      Status: s.isActive ? "Active" : "Inactive",
-      "Monthly fee (override)": s.monthlyFee ?? "",
-      Notes: s.notes ?? "",
-    };
-  });
+  const currentYear = currentYearMonth().year;
 
   const headers = [
     "Full name",
@@ -50,10 +39,29 @@ export async function GET(request: NextRequest) {
     "Age",
     "Parent phone",
     "Group",
-    "Status",
+    "School",
+    "Address",
     "Monthly fee (override)",
+    "Left the academy",
     "Notes",
   ];
+
+  const rows = students.map((s) => {
+    // Dates of birth are stored at UTC midnight → read the UTC year.
+    const year = Number(birthYear(s.dateOfBirth)) || "";
+    return {
+      "Full name": s.fullName,
+      "Year of birth": year,
+      Age: typeof year === "number" ? currentYear - year : "",
+      "Parent phone": s.phoneNumber ?? "",
+      Group: s.group?.name ?? "",
+      School: s.school ?? "",
+      Address: s.address ?? "",
+      "Monthly fee (override)": s.monthlyFee ?? "",
+      "Left the academy": s.archived ? "Yes" : "No",
+      Notes: s.notes ?? "",
+    };
+  });
 
   const ws = XLSX.utils.json_to_sheet(rows, { header: headers });
 
@@ -63,8 +71,10 @@ export async function GET(request: NextRequest) {
     { wch: 6 }, // Age
     { wch: 18 }, // Parent phone
     { wch: 20 }, // Group
-    { wch: 10 }, // Status
+    { wch: 20 }, // School
+    { wch: 28 }, // Address
     { wch: 20 }, // Monthly fee (override)
+    { wch: 16 }, // Left the academy
     { wch: 30 }, // Notes
   ];
 
@@ -73,8 +83,7 @@ export async function GET(request: NextRequest) {
 
   const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" }) as ArrayBuffer;
 
-  const today = new Date().toISOString().slice(0, 10);
-  const filename = `students-${today}.xlsx`;
+  const filename = `students-${todayIso()}.xlsx`;
 
   return new Response(arrayBuffer, {
     status: 200,

@@ -35,7 +35,11 @@ export function CarryOverButton({
       }
       const created = res.data?.created ?? 0;
       if (created === 0) {
-        toast.info(t("roster.add.empty"));
+        toast.info(
+          res.data?.alreadyFilled
+            ? t("payments.roster.carry.alreadyFilled")
+            : t("payments.roster.carry.nothing"),
+        );
         return;
       }
       toast.success(t("roster.carried", { count: created, month: fromLabel }));

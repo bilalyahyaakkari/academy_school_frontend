@@ -40,6 +40,32 @@ async function buildHeaders(opts: RequestOptions): Promise<HeadersInit> {
   return headers;
 }
 
+/**
+ * Builds a readable message from a backend error body. Validation failures
+ * include the first few field errors instead of just "Validation failed".
+ */
+function errorMessageFrom(status: number, body: unknown, unauthenticated?: boolean): string {
+  if (status === 401 && !unauthenticated) {
+    return "Your session has expired. Please sign in again.";
+  }
+  if (body && typeof body === "object") {
+    const b = body as { message?: unknown; errors?: unknown };
+    let message = typeof b.message === "string" ? b.message : null;
+    if (Array.isArray(b.message)) message = b.message.join(", ");
+    if (Array.isArray(b.errors) && b.errors.length > 0) {
+      const details = (b.errors as { path?: string; message?: string }[])
+        .slice(0, 3)
+        .map((e) => (e.path ? `${e.path}: ${e.message}` : e.message))
+        .filter(Boolean)
+        .join("; ");
+      const more = b.errors.length > 3 ? ` (+${b.errors.length - 3} more)` : "";
+      if (details) message = `${message ?? "Validation failed"} — ${details}${more}`;
+    }
+    if (message) return message;
+  }
+  return `Request failed (${status})`;
+}
+
 export async function apiFetch<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const url = `${BACKEND_URL}${path}`;
   const headers = await buildHeaders(opts);
@@ -58,11 +84,7 @@ export async function apiFetch<T>(path: string, opts: RequestOptions = {}): Prom
     } catch {
       // ignore parse errors
     }
-    const message =
-      (body && typeof body === "object" && "message" in body && typeof body.message === "string"
-        ? body.message
-        : null) ?? `Request failed (${res.status})`;
-    throw new ApiError(message, res.status, body);
+    throw new ApiError(errorMessageFrom(res.status, body, opts.unauthenticated), res.status, body);
   }
 
   // 204 No Content

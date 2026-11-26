@@ -26,8 +26,26 @@ class BackendUnavailable extends CredentialsSignin {
   code = "backend_unavailable";
 }
 
+/** Reads the `exp` claim (seconds since epoch) from the backend's JWT. */
+function tokenExpiry(accessToken: string | undefined): number | undefined {
+  if (!accessToken) return undefined;
+  try {
+    const payload = JSON.parse(
+      Buffer.from(accessToken.split(".")[1] ?? "", "base64url").toString("utf8"),
+    );
+    return typeof payload.exp === "number" ? payload.exp : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Matches the backend's default JWT_EXPIRES_IN ("7d"). */
+const SESSION_MAX_AGE = 7 * 24 * 60 * 60;
+
 export const { auth, handlers, signIn, signOut } = NextAuth({
-  session: { strategy: "jwt" },
+  // The session can't outlive the backend token it wraps: once that token
+  // expires every API call would 401 while the app still looks signed in.
+  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE },
   pages: { signIn: "/login" },
   trustHost: true,
   providers: [
@@ -83,6 +101,13 @@ export const { auth, handlers, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id;
         token.accessToken = (user as { accessToken?: string }).accessToken;
+        token.accessTokenExpires = tokenExpiry(token.accessToken as string | undefined);
+      }
+      // Backend token expired → end the session so the user is sent to /login
+      // instead of every page failing with 401.
+      const expires = token.accessTokenExpires as number | undefined;
+      if (expires && Date.now() / 1000 >= expires - 60) {
+        return null;
       }
       return token;
     },

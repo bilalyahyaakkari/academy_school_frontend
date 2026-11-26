@@ -16,8 +16,8 @@ export default function manifest(): MetadataRoute.Manifest {
     // Opens without browser chrome, like a native app.
     display: "standalone",
     background_color: "#ffffff",
-    // Tints the Android status bar — the crest's navy.
-    theme_color: "#142473",
+    // Tints the Android status bar — sea-900, the sidebar colour.
+    theme_color: "#0a3c55",
     orientation: "portrait",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

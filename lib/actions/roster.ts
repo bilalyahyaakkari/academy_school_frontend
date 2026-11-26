@@ -3,13 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { rosterApi } from "@/lib/api/roster";
 import { ApiError } from "@/lib/api/client";
+import { getT } from "@/lib/i18n/server";
+import type { TranslationKey } from "@/lib/i18n";
 
 type ActionResult<T = void> =
   | { success: true; data?: T }
   | { success: false; error: string };
 
-function errMsg(err: unknown, fallback: string): string {
-  return err instanceof ApiError ? err.message : fallback;
+async function errMsg(err: unknown, fallback: TranslationKey): Promise<string> {
+  if (err instanceof ApiError) return err.message;
+  const t = await getT();
+  return t(fallback);
 }
 
 /** Roster changes move headcounts and invoices, so refresh both areas. */
@@ -25,13 +29,20 @@ function revalidateMonthScopedPages() {
 export async function seedRosterMonth(
   year: number,
   month: number,
-): Promise<ActionResult<{ created: number }>> {
+): Promise<ActionResult<{ created: number; alreadyFilled: boolean }>> {
   try {
-    const data = await rosterApi.seed(year, month);
+    const { created } = await rosterApi.seed(year, month);
+    // Nothing created means one of two very different things: the month
+    // already had its students, or there was nobody to carry over. Look.
+    let alreadyFilled = false;
+    if (created === 0) {
+      const roster = await rosterApi.month(year, month);
+      alreadyFilled = roster.students.length > 0;
+    }
     revalidateMonthScopedPages();
-    return { success: true, data };
+    return { success: true, data: { created, alreadyFilled } };
   } catch (err) {
-    return { success: false, error: errMsg(err, "Failed to fill this month") };
+    return { success: false, error: await errMsg(err, "payments.error.roster.fill") };
   }
 }
 
@@ -41,14 +52,15 @@ export async function addStudentsToMonth(
   studentIds: string[],
 ): Promise<ActionResult<{ added: number; restored: number }>> {
   if (studentIds.length === 0) {
-    return { success: false, error: "No students selected" };
+    const t = await getT();
+    return { success: false, error: t("payments.error.roster.noneSelected") };
   }
   try {
     const data = await rosterApi.add(year, month, studentIds);
     revalidateMonthScopedPages();
     return { success: true, data };
   } catch (err) {
-    return { success: false, error: errMsg(err, "Failed to add students") };
+    return { success: false, error: await errMsg(err, "payments.error.roster.add") };
   }
 }
 
@@ -62,7 +74,7 @@ export async function removeStudentFromMonth(
     revalidateMonthScopedPages();
     return { success: true, data };
   } catch (err) {
-    return { success: false, error: errMsg(err, "Failed to remove student") };
+    return { success: false, error: await errMsg(err, "payments.error.roster.remove") };
   }
 }
 
@@ -76,6 +88,6 @@ export async function markStudentLeft(
     revalidateMonthScopedPages();
     return { success: true, data };
   } catch (err) {
-    return { success: false, error: errMsg(err, "Failed to update student") };
+    return { success: false, error: await errMsg(err, "payments.error.roster.update") };
   }
 }

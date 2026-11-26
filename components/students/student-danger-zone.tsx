@@ -12,29 +12,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { deleteStudent, toggleStudentActive } from "@/lib/actions/students";
+import { deleteStudent } from "@/lib/actions/students";
+import { useT } from "@/lib/i18n/client";
 import { toast } from "sonner";
-import { Trash2, PowerOff, Power, Loader2 } from "lucide-react";
+import { Trash2, Loader2 } from "lucide-react";
 
 export function StudentDangerZone({
   studentId,
   fullName,
-  isActive,
 }: {
   studentId: string;
   fullName: string;
-  isActive: boolean;
 }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
-
-  const onToggle = () => {
-    startTransition(async () => {
-      const res = await toggleStudentActive(studentId);
-      if (res?.success === false) toast.error(res.error);
-      else toast.success(isActive ? "Marked inactive" : "Marked active");
-    });
-  };
 
   const onDelete = () => {
     startTransition(async () => {
@@ -47,42 +39,33 @@ export function StudentDangerZone({
   return (
     <Card className="border-destructive/30">
       <CardHeader>
-        <CardTitle className="text-base text-destructive">Danger zone</CardTitle>
-        <CardDescription>These actions cannot be easily undone.</CardDescription>
+        <CardTitle className="text-base text-destructive">{t("students.danger.title")}</CardTitle>
+        <CardDescription>{t("students.danger.desc")}</CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 flex-col gap-3 sm:flex-row">
-          <Button variant="outline" onClick={onToggle} disabled={pending}>
-            {isActive ? <PowerOff className="size-4" /> : <Power className="size-4" />}
-            {isActive ? "Mark inactive" : "Mark active"}
-          </Button>
-
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button variant="destructive">
-                <Trash2 className="size-4" />
-                Delete student
+      <CardContent>
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button variant="destructive">
+              <Trash2 className="size-4" />
+              {t("students.danger.delete")}
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t("students.delete.title", { name: fullName })}</DialogTitle>
+              <DialogDescription>{t("students.delete.desc")}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
+                {t("common.cancel")}
               </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Delete {fullName}?</DialogTitle>
-                <DialogDescription>
-                  This permanently removes the student and all their payment records.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
-                  Cancel
-                </Button>
-                <Button variant="destructive" onClick={onDelete} disabled={pending}>
-                  {pending && <Loader2 className="size-4 animate-spin" />}
-                  Delete
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+              <Button variant="destructive" onClick={onDelete} disabled={pending}>
+                {pending && <Loader2 className="size-4 animate-spin" />}
+                {t("common.delete")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

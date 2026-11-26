@@ -8,15 +8,19 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { PageHeader } from "@/components/app/page-header";
+import { SummaryStrip } from "@/components/app/summary-strip";
 import { StudentDangerZone } from "@/components/students/student-danger-zone";
+import { SiblingsCard } from "@/components/students/siblings-card";
 import { PaymentTimeline } from "@/components/payments/payment-timeline";
 import {
+  birthYear,
   formatAge,
   formatCurrency,
   formatDate,
-  monthLabel,
   whatsappReminderUrl,
 } from "@/lib/utils";
+import { getLocale, getT } from "@/lib/i18n/server";
+import { monthLabelI18n } from "@/lib/i18n";
 import { Pencil, MessageCircle } from "lucide-react";
 
 type Params = Promise<{ id: string }>;
@@ -32,138 +36,180 @@ export default async function StudentDetailPage({ params }: { params: Params }) 
     throw err;
   }
 
-  const settings = await settingsApi.get().catch(() => null);
+  const [settings, suggestions, t, locale] = await Promise.all([
+    settingsApi.get().catch(() => null),
+    // Same parent phone, not linked yet — offered first in "Link sibling".
+    studentsApi.siblingSuggestions(id).catch(() => []),
+    getT(),
+    getLocale(),
+  ]);
 
   // Effective fee: override > group fee > default fee.
   const effectiveFee =
     student.monthlyFee ?? student.group?.monthlyFee ?? settings?.defaultFee ?? 0;
   const feeSource = student.monthlyFee != null
-    ? "custom override"
+    ? t("students.detail.fee.custom")
     : student.group
-      ? `from ${student.group.name}`
-      : "default fee";
+      ? t("students.detail.fee.group", { group: student.group.name })
+      : t("students.detail.fee.default");
 
-  const totalDue = student.payments
-    .filter((p) => p.status !== "PAID")
-    .reduce((sum, p) => sum + p.amount - p.paidAmount, 0);
+  // Every invoice with money still owed, oldest first.
+  const owed = student.payments
+    .filter((p) => p.status !== "PAID" && p.amount - p.paidAmount > 0)
+    .sort((a, b) => a.year - b.year || a.month - b.month);
+  const totalDue = owed.reduce((sum, p) => sum + p.amount - p.paidAmount, 0);
   const totalPaid = student.payments.reduce((sum, p) => sum + p.paidAmount, 0);
 
-  // Pick the oldest unpaid month for the WhatsApp reminder.
-  const oldestUnpaid = [...student.payments].reverse().find((p) => p.status !== "PAID");
+  // The reminder asks for the whole balance and names every month it covers,
+  // so the amount and the month(s) in the message always describe the same debt.
   const reminderUrl =
-    student.phoneNumber && oldestUnpaid && settings
+    student.phoneNumber && owed.length > 0 && settings
       ? whatsappReminderUrl({
           phoneNumber: student.phoneNumber,
           studentName: student.fullName,
-          amount: oldestUnpaid.amount - oldestUnpaid.paidAmount,
-          month: oldestUnpaid.month,
-          year: oldestUnpaid.year,
+          amount: totalDue,
+          month: owed[0].month,
+          year: owed[0].year,
+          months: owed.map((p) => ({ month: p.month, year: p.year })),
           academyName: settings.academyName,
           countryCode: settings.whatsappCountry,
           template: settings.whatsappTemplate,
         })
       : null;
+  const reminderHint = t("students.detail.whatsapp.hint", {
+    amount: formatCurrency(totalDue),
+    months: owed
+      .map((p) => monthLabelI18n(locale, p.month, p.year))
+      .join(locale === "ar" ? "، " : ", "),
+  });
 
   return (
     <div className="space-y-6">
       <PageHeader
+        showTitle
         title={student.fullName}
-        description={formatAge(student.dateOfBirth)}
+        description={formatAge(student.dateOfBirth, locale)}
         backHref="/students"
-        backLabel="Back to students"
+        backLabel={t("students.back")}
         actions={
           <>
             {reminderUrl && (
               <Button asChild variant="outline">
-                <a href={reminderUrl} target="_blank" rel="noopener noreferrer">
+                <a
+                  href={reminderUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={reminderHint}
+                >
                   <MessageCircle className="size-4" />
-                  WhatsApp reminder
+                  {t("students.detail.whatsapp")}
                 </a>
               </Button>
             )}
             <Button asChild>
               <Link href={`/students/${student.id}/edit`}>
                 <Pencil className="size-4" />
-                Edit
+                {t("common.edit")}
               </Link>
             </Button>
           </>
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-base">Profile</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 text-sm sm:grid-cols-2">
-            <Field label="Year of birth" value={new Date(student.dateOfBirth).getFullYear()} />
-            <Field label="Parent phone" value={student.phoneNumber ?? "—"} />
-            <Field
-              label="Group"
-              value={
-                student.group ? (
-                  <Link href={`/groups/${student.group.id}`} className="hover:underline">
-                    {student.group.name}
-                  </Link>
-                ) : (
-                  "—"
-                )
-              }
-            />
-            <Field
-              label="Status"
-              value={
-                student.isActive ? (
-                  <Badge variant="success">Active</Badge>
-                ) : (
-                  <Badge variant="secondary">Inactive</Badge>
-                )
-              }
-            />
-            <Field
-              label="Monthly fee"
-              value={
-                <span>
-                  {formatCurrency(effectiveFee)}{" "}
-                  <span className="text-xs text-muted-foreground">({feeSource})</span>
-                </span>
-              }
-            />
-            {student.notes && (
-              <div className="sm:col-span-2">
-                <Separator className="my-2" />
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Notes</p>
-                <p className="mt-1 whitespace-pre-wrap">{student.notes}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <div className="space-y-4">
-          <Card>
-            <CardContent className="space-y-3 pt-6">
-              <Stat label="Total paid" value={formatCurrency(totalPaid)} />
-              <Stat
-                label="Total outstanding"
-                value={formatCurrency(totalDue)}
-                tone={totalDue > 0 ? "warn" : "ok"}
-              />
-              <Stat label="Payments on record" value={String(student.payments.length)} />
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <SummaryStrip
+        items={[
+          {
+            label: t("students.detail.totalPaid"),
+            value: formatCurrency(totalPaid),
+          },
+          {
+            label: t("students.detail.totalDue"),
+            value: formatCurrency(totalDue),
+            tone: totalDue > 0 ? "alert" : "default",
+          },
+          {
+            label: t("students.detail.paymentsCount"),
+            value: student.payments.length,
+          },
+        ]}
+      />
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Payment history</CardTitle>
+          <CardTitle className="text-base">{t("students.detail.profile")}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 text-sm sm:grid-cols-2">
+          {student.archived && (
+            <Field
+              label={t("table.status")}
+              value={
+                <span className="inline-flex flex-wrap items-center gap-2">
+                  <Badge variant="soft">{t("students.badge.left")}</Badge>
+                  {student.archivedAt && (
+                    <span className="text-xs text-muted-foreground">
+                      {t("students.detail.leftSince", {
+                        date: formatDate(student.archivedAt, locale),
+                      })}
+                    </span>
+                  )}
+                </span>
+              }
+            />
+          )}
+          <Field label={t("studentForm.birthYear")} value={birthYear(student.dateOfBirth) || "—"} />
+          <Field
+            label={t("studentForm.phone")}
+            value={student.phoneNumber ? <span dir="ltr">{student.phoneNumber}</span> : "—"}
+          />
+          <Field
+            label={t("studentForm.group")}
+            value={
+              student.group ? (
+                <Link href={`/groups/${student.group.id}`} className="hover:underline">
+                  {student.group.name}
+                </Link>
+              ) : (
+                "—"
+              )
+            }
+          />
+          <Field label={t("studentForm.school")} value={student.school || "—"} />
+          <Field label={t("studentForm.address")} value={student.address || "—"} />
+          <Field
+            label={t("students.detail.fee")}
+            value={
+              <span>
+                {formatCurrency(effectiveFee)}{" "}
+                <span className="text-xs text-muted-foreground">({feeSource})</span>
+              </span>
+            }
+          />
+          {student.notes && (
+            <div className="sm:col-span-2">
+              <Separator className="my-2" />
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                {t("studentForm.notes")}
+              </p>
+              <p className="mt-1 whitespace-pre-wrap">{student.notes}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <SiblingsCard
+        studentId={student.id}
+        studentName={student.fullName}
+        siblings={student.siblings ?? []}
+        suggestions={suggestions}
+      />
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t("students.detail.history")}</CardTitle>
         </CardHeader>
         <CardContent>
           {student.payments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No payments yet. Generate monthly invoices from the Payments page.
-            </p>
+            <p className="text-sm text-muted-foreground">{t("students.detail.noPayments")}</p>
           ) : (
             <PaymentTimeline
               payments={student.payments.map((p) => ({
@@ -172,18 +218,19 @@ export default async function StudentDetailPage({ params }: { params: Params }) 
                 year: p.year,
                 amount: p.amount,
                 paidAmount: p.paidAmount,
+                discount: p.discount,
                 status: p.status,
                 paymentMethod: p.paymentMethod,
                 paymentDate: p.paymentDate,
                 notes: p.notes,
-                label: monthLabel(p.month, p.year),
+                label: monthLabelI18n(locale, p.month, p.year),
               }))}
             />
           )}
         </CardContent>
       </Card>
 
-      <StudentDangerZone studentId={student.id} fullName={student.fullName} isActive={student.isActive} />
+      <StudentDangerZone studentId={student.id} fullName={student.fullName} />
     </div>
   );
 }
@@ -193,25 +240,6 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     <div>
       <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
       <div className="mt-1">{value}</div>
-    </div>
-  );
-}
-
-function Stat({ label, value, tone }: { label: string; value: string; tone?: "ok" | "warn" }) {
-  return (
-    <div className="flex items-baseline justify-between">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span
-        className={
-          tone === "warn"
-            ? "font-semibold text-destructive"
-            : tone === "ok"
-              ? "font-semibold text-success"
-              : "font-semibold"
-        }
-      >
-        {value}
-      </span>
     </div>
   );
 }

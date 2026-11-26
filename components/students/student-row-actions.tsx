@@ -23,7 +23,7 @@ import {
   Pencil,
   Trash2,
   Loader2,
-  Archive,
+  LogOut,
   ArchiveRestore,
 } from "lucide-react";
 
@@ -38,6 +38,7 @@ export function StudentRowActions({
 }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [archivePending, startArchiveTransition] = useTransition();
 
@@ -48,11 +49,14 @@ export function StudentRowActions({
         toast.error(res.error);
         return;
       }
-      toast.success(`Deleted ${studentName}`);
+      toast.success(t("students.toast.deleted", { name: studentName }));
     });
   };
 
-  const onArchive = () => {
+  // Marking as left removes the student from every future month (roster and
+  // invoices), so it goes through a confirmation. Restoring is harmless and
+  // runs straight away.
+  const runArchive = () => {
     startArchiveTransition(async () => {
       const res = archived
         ? await unarchiveStudent(studentId)
@@ -61,18 +65,26 @@ export function StudentRowActions({
         toast.error(res.error);
         return;
       }
+      setArchiveOpen(false);
       toast.success(
         archived
-          ? t("students.archive.restored", { name: studentName })
-          : t("students.archive.archived", { name: studentName }),
+          ? t("students.toast.restored", { name: studentName })
+          : t("students.toast.markedLeft", { name: studentName }),
       );
     });
   };
 
+  const archiveLabel = archived
+    ? t("students.restore.action")
+    : t("students.markLeft.action");
+
   return (
     <div className="flex items-center justify-end gap-1">
       <Button asChild size="icon" variant="ghost">
-        <Link href={`/students/${studentId}/edit`} aria-label={`Edit ${studentName}`}>
+        <Link
+          href={`/students/${studentId}/edit`}
+          aria-label={t("students.action.editName", { name: studentName })}
+        >
           <Pencil className="size-4" />
         </Link>
       </Button>
@@ -80,22 +92,14 @@ export function StudentRowActions({
       <Button
         size="icon"
         variant="ghost"
-        onClick={onArchive}
+        onClick={archived ? runArchive : () => setArchiveOpen(true)}
         disabled={archivePending}
-        aria-label={
-          archived
-            ? t("students.archive.action.restore")
-            : t("students.archive.action.archive")
-        }
-        title={
-          archived
-            ? t("students.archive.action.restore")
-            : t("students.archive.action.archive")
-        }
+        aria-label={archiveLabel}
+        title={archiveLabel}
         className={
           archived
-            ? "text-emerald-600 hover:bg-emerald-500/10 hover:text-emerald-700 dark:text-emerald-400"
-            : "text-amber-600 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-400"
+            ? "text-sea-700 hover:bg-sea-100 hover:text-sea-800"
+            : "text-sea-900/70 hover:bg-sea-100 hover:text-sea-900"
         }
       >
         {archivePending ? (
@@ -103,9 +107,33 @@ export function StudentRowActions({
         ) : archived ? (
           <ArchiveRestore className="size-4" />
         ) : (
-          <Archive className="size-4" />
+          <LogOut className="size-4 rtl:rotate-180" />
         )}
       </Button>
+
+      {!archived && (
+        <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+          <DialogContent onClick={(e) => e.stopPropagation()}>
+            <DialogHeader>
+              <DialogTitle>{t("students.markLeft.title", { name: studentName })}</DialogTitle>
+              <DialogDescription>{t("students.markLeft.desc")}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="ghost"
+                onClick={() => setArchiveOpen(false)}
+                disabled={archivePending}
+              >
+                {t("common.cancel")}
+              </Button>
+              <Button onClick={runArchive} disabled={archivePending}>
+                {archivePending && <Loader2 className="size-4 animate-spin" />}
+                {t("students.markLeft.confirm")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
@@ -113,26 +141,23 @@ export function StudentRowActions({
             size="icon"
             variant="ghost"
             className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-            aria-label={`Delete ${studentName}`}
+            aria-label={t("students.action.deleteName", { name: studentName })}
           >
             <Trash2 className="size-4" />
           </Button>
         </DialogTrigger>
         <DialogContent onClick={(e) => e.stopPropagation()}>
           <DialogHeader>
-            <DialogTitle>Delete {studentName}?</DialogTitle>
-            <DialogDescription>
-              This permanently removes the student and all their payment records.
-              This cannot be undone.
-            </DialogDescription>
+            <DialogTitle>{t("students.delete.title", { name: studentName })}</DialogTitle>
+            <DialogDescription>{t("students.delete.desc")}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)} disabled={pending}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button variant="destructive" onClick={onDelete} disabled={pending}>
               {pending && <Loader2 className="size-4 animate-spin" />}
-              Delete
+              {t("common.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>

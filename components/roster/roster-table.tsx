@@ -82,20 +82,14 @@ export function RosterTable({
     if (!s.payment) return <Badge variant="outline">{t("roster.invoice.none")}</Badge>;
     if (s.payment.status === "PAID")
       return (
-        <Badge className="bg-emerald-500/15 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-400">
-          {t("common.paid")}
-        </Badge>
+        <Badge variant="success">{t("common.paid")}</Badge>
       );
     if (s.payment.status === "PARTIAL")
       return (
-        <Badge className="bg-amber-500/15 text-amber-700 hover:bg-amber-500/15 dark:text-amber-400">
-          {t("common.partial")}
-        </Badge>
+        <Badge variant="warning">{t("common.partial")}</Badge>
       );
     return (
-      <Badge className="bg-rose-500/15 text-rose-700 hover:bg-rose-500/15 dark:text-rose-400">
-        {t("common.unpaid")}
-      </Badge>
+      <Badge variant="alert">{t("common.unpaid")}</Badge>
     );
   };
 
@@ -124,21 +118,16 @@ export function RosterTable({
                       {s.fullName}
                     </Link>
                     {s.isNew && (
-                      <Badge className="bg-blue-500/15 text-blue-700 hover:bg-blue-500/15 dark:text-blue-400">
-                        {t("roster.badge.new")}
-                      </Badge>
+                      <Badge variant="soft">{t("roster.badge.new")}</Badge>
                     )}
                     {s.archived && (
-                      <Badge
-                        variant="outline"
-                        className="border-amber-500/40 text-amber-600 dark:text-amber-400"
-                      >
-                        {t("roster.badge.left")}
-                      </Badge>
+                      <Badge variant="soft">{t("roster.badge.left")}</Badge>
                     )}
                   </div>
                   {s.phoneNumber && (
-                    <p className="text-xs text-muted-foreground">{s.phoneNumber}</p>
+                    <p className="text-xs text-muted-foreground">
+                      <span dir="ltr">{s.phoneNumber}</span>
+                    </p>
                   )}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
@@ -155,8 +144,8 @@ export function RosterTable({
                     <Button
                       size="icon"
                       variant="ghost"
-                      title={t("roster.action.remove")}
-                      aria-label={t("roster.action.remove")}
+                      title={t("payments.roster.remove.label", { month: monthName })}
+                      aria-label={t("payments.roster.remove.label", { month: monthName })}
                       onClick={() => setConfirm({ student: s, mode: "remove" })}
                     >
                       <X className="size-4" />
@@ -164,9 +153,9 @@ export function RosterTable({
                     <Button
                       size="icon"
                       variant="ghost"
-                      className="text-amber-600 hover:bg-amber-500/10 hover:text-amber-700 dark:text-amber-400"
-                      title={t("roster.action.markLeft")}
-                      aria-label={t("roster.action.markLeft")}
+                      className="text-sea-900/70 hover:bg-sea-100 hover:text-sea-900"
+                      title={t("payments.roster.left.label", { month: monthName })}
+                      aria-label={t("payments.roster.left.label", { month: monthName })}
                       onClick={() => setConfirm({ student: s, mode: "left" })}
                     >
                       <LogOut className="size-4 rtl:rotate-180" />
@@ -193,7 +182,10 @@ export function RosterTable({
             <DialogDescription>
               {confirm?.mode === "left"
                 ? t("roster.markLeft.desc", { month: monthName })
-                : t("roster.remove.desc", { month: monthName })}
+                : t("payments.roster.remove.desc", {
+                    name: confirm?.student.fullName ?? "",
+                    month: monthName,
+                  })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

@@ -18,7 +18,12 @@ export function GeneralSection({
   const [pending, startTransition] = useTransition();
   const t = useT();
 
-  const onSubmit = (formData: FormData) => {
+  // onSubmit rather than <form action>: React 19 resets an action form's
+  // uncontrolled fields after every submit, so a failed save would wipe the
+  // edits back to the old values.
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
     startTransition(async () => {
       const res = await updateSettings(formData);
       if (res.success) toast.success(t("settings.general.toast.saved"));
@@ -27,22 +32,18 @@ export function GeneralSection({
   };
 
   return (
-    <Card className="group relative overflow-hidden transition-all hover:shadow-lg">
+    <Card className="group relative overflow-hidden transition-shadow hover:shadow-md">
       <span
         aria-hidden
-        className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-500 via-blue-500 to-cyan-400"
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute -right-16 -top-16 size-44 animate-drift-1 rounded-full bg-blue-400/20 blur-3xl"
+        className="absolute inset-x-0 top-0 h-1 bg-sea-800"
       />
       <CardContent className="relative pt-6">
         <div className="mb-6 flex items-center gap-3">
-          <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-md">
+          <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-sea-100 text-sea-800">
             <SettingsIcon className="size-5" />
           </div>
           <div>
-            <h2 className="text-lg font-bold tracking-tight">
+            <h2 className="text-lg font-bold tracking-tight text-sea-900">
               {t("settings.general.title")}
             </h2>
             <p className="text-xs text-muted-foreground">
@@ -51,7 +52,7 @@ export function GeneralSection({
           </div>
         </div>
 
-        <form action={onSubmit} className="grid gap-4 md:grid-cols-2">
+        <form onSubmit={onSubmit} className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2 md:col-span-2">
             <Label htmlFor="academyName">
               {t("settings.general.academyName")}

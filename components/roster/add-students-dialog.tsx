@@ -17,7 +17,8 @@ import {
 import { addStudentsToMonth } from "@/lib/actions/roster";
 import type { RosterCandidate } from "@/lib/api/types";
 import { toast } from "sonner";
-import { useT } from "@/lib/i18n/client";
+import { useLocale, useT } from "@/lib/i18n/client";
+import { normalizeArabic } from "@/lib/arabic";
 import { Loader2, UserPlus } from "lucide-react";
 
 /**
@@ -38,15 +39,16 @@ export function AddStudentsDialog({
   variant?: "default" | "outline";
 }) {
   const t = useT();
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pending, start] = useTransition();
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = normalizeArabic(query);
     if (!q) return candidates;
-    return candidates.filter((c) => c.fullName.toLowerCase().includes(q));
+    return candidates.filter((c) => normalizeArabic(c.fullName).includes(q));
   }, [candidates, query]);
 
   const toggle = (id: string) => {
@@ -68,14 +70,32 @@ export function AddStudentsDialog({
       }
       const added = res.data?.added ?? 0;
       const restored = res.data?.restored ?? 0;
-      if (added === 1) {
+      // The backend only reports how many were added, not who. Anyone already
+      // in the month is skipped, so names are only safe when every pick went in.
+      if (added === 0) {
+        toast.info(t("payments.roster.added.none", { month: monthName }));
+      } else if (added < ids.length) {
+        toast.success(
+          t("payments.roster.added.partial", {
+            added,
+            selected: ids.length,
+            month: monthName,
+          }),
+        );
+      } else if (added === 1) {
         const name = candidates.find((c) => c.id === ids[0])?.fullName ?? "";
         toast.success(t("roster.toast.added.one", { name, month: monthName }));
+      } else if (added <= 3) {
+        const names = ids
+          .map((id) => candidates.find((c) => c.id === id)?.fullName)
+          .filter(Boolean)
+          .join(locale === "ar" ? "، " : ", ");
+        toast.success(t("payments.roster.added.names", { names, month: monthName }));
       } else {
         toast.success(t("roster.toast.added", { count: added, month: monthName }));
       }
       if (restored > 0) {
-        toast.info(t("roster.toast.restored", { count: restored }));
+        toast.info(t("payments.roster.restored", { count: restored }));
       }
       setSelected(new Set());
       setQuery("");
@@ -136,10 +156,7 @@ export function AddStudentsDialog({
                     </span>
                   )}
                   {c.archived && (
-                    <Badge
-                      variant="outline"
-                      className="shrink-0 border-amber-500/40 text-amber-600 dark:text-amber-400"
-                    >
+                    <Badge variant="soft" className="shrink-0">
                       {t("roster.add.returning")}
                     </Badge>
                   )}

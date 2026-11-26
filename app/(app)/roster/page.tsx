@@ -3,53 +3,25 @@ import { rosterApi } from "@/lib/api/roster";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/app/page-header";
+import { SummaryStrip } from "@/components/app/summary-strip";
 import { MonthPicker } from "@/components/payments/month-picker";
 import { RosterTable } from "@/components/roster/roster-table";
 import { AddStudentsDialog } from "@/components/roster/add-students-dialog";
 import { CarryOverButton } from "@/components/roster/carry-over-button";
-import { formatCurrency, cn } from "@/lib/utils";
+import { formatCurrency, resolveYearMonth } from "@/lib/utils";
 import { getT, getLocale } from "@/lib/i18n/server";
 import { monthLabelI18n } from "@/lib/i18n";
-import { CalendarRange, UserPlus, UserMinus, CircleDollarSign, Wallet } from "lucide-react";
+import { CalendarRange, Wallet } from "lucide-react";
 
-export const metadata = { title: "Monthly roster — Academy" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: `${t("roster.title")} — Academy` };
+}
 
-type SearchParams = Promise<{ year?: string; month?: string }>;
-
-type Tone = "blue" | "green" | "amber" | "rose";
-
-const TONES: Record<Tone, { bar: string; blob: string; iconBg: string; drift: string }> = {
-  blue: {
-    bar: "from-blue-500 via-blue-500 to-cyan-400",
-    blob: "bg-blue-400/40",
-    iconBg: "bg-gradient-to-br from-blue-500 to-blue-600 text-white",
-    drift: "animate-drift-1",
-  },
-  green: {
-    bar: "from-emerald-500 via-emerald-500 to-teal-400",
-    blob: "bg-emerald-400/40",
-    iconBg: "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white",
-    drift: "animate-drift-2",
-  },
-  amber: {
-    bar: "from-amber-500 via-orange-500 to-red-500",
-    blob: "bg-orange-400/40",
-    iconBg: "bg-gradient-to-br from-amber-500 to-orange-600 text-white",
-    drift: "animate-drift-3",
-  },
-  rose: {
-    bar: "from-rose-500 via-pink-500 to-rose-400",
-    blob: "bg-rose-400/40",
-    iconBg: "bg-gradient-to-br from-rose-500 to-rose-600 text-white",
-    drift: "animate-drift-1",
-  },
-};
+type SearchParams = Promise<{ year?: string | string[]; month?: string | string[] }>;
 
 export default async function RosterPage({ searchParams }: { searchParams: SearchParams }) {
-  const sp = await searchParams;
-  const now = new Date();
-  const year = sp.year ? Number(sp.year) : now.getFullYear();
-  const month = sp.month ? Number(sp.month) : now.getMonth() + 1;
+  const { year, month } = resolveYearMonth(await searchParams);
 
   const t = await getT();
   const locale = await getLocale();
@@ -71,17 +43,9 @@ export default async function RosterPage({ searchParams }: { searchParams: Searc
     0,
   );
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title={t("roster.title")}
-        description={
-          roster.students.length === 1
-            ? t("roster.desc.one", { month: monthName })
-            : t("roster.desc", { count: roster.students.length, month: monthName })
-        }
-        actions={
-          <>
+  // The page has no title bar: its buttons live in the summary card.
+  const pageActions = (
+    <>
             <Button asChild variant="outline">
               <Link href={`/payments?year=${year}&month=${month}`}>
                 <Wallet className="size-4" />
@@ -95,6 +59,16 @@ export default async function RosterPage({ searchParams }: { searchParams: Searc
               candidates={candidates}
             />
           </>
+  );
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title={t("roster.title")}
+        description={
+          roster.students.length === 1
+            ? t("roster.desc.one", { month: monthName })
+            : t("roster.desc", { count: roster.students.length, month: monthName })
         }
       />
 
@@ -129,33 +103,29 @@ export default async function RosterPage({ searchParams }: { searchParams: Searc
         </Card>
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <Stat
-              label={t("roster.stat.total")}
-              value={String(roster.students.length)}
-              icon={<CalendarRange className="size-5" />}
-              tone="blue"
-            />
-            <Stat
-              label={t("roster.stat.new")}
-              value={String(roster.newCount)}
-              icon={<UserPlus className="size-5" />}
-              tone="green"
-            />
-            <Stat
-              label={t("roster.stat.left", { month: prevName })}
-              value={String(roster.leftCount)}
-              icon={<UserMinus className="size-5" />}
-              tone={roster.leftCount > 0 ? "amber" : "green"}
-            />
-            <Stat
-              label={t("roster.stat.collected")}
-              value={formatCurrency(collected)}
-              sub={formatCurrency(due)}
-              icon={<CircleDollarSign className="size-5" />}
-              tone="rose"
-            />
-          </div>
+          <SummaryStrip
+            actions={pageActions}
+            items={[
+              {
+                label: t("roster.stat.total"),
+                value: roster.students.length,
+              },
+              {
+                label: t("roster.stat.new"),
+                value: roster.newCount,
+              },
+              {
+                label: t("roster.stat.left", { month: prevName }),
+                value: roster.leftCount,
+              },
+              {
+                label: t("roster.stat.collected"),
+                value: formatCurrency(collected),
+                suffix: t("dashboard.stat.collected.sub", { expected: formatCurrency(due) }),
+                progress: due > 0 ? Math.min(100, (collected / due) * 100) : 0,
+              },
+            ]}
+          />
 
           <RosterTable
             year={year}
@@ -178,7 +148,7 @@ export default async function RosterPage({ searchParams }: { searchParams: Searc
                     <Link
                       key={s.studentId}
                       href={`/students/${s.studentId}`}
-                      className="rounded-full bg-muted px-3 py-1 text-sm transition-colors hover:bg-muted/70"
+                      className="rounded-full bg-sea-100 px-3 py-1 text-sm text-sea-900 transition-colors hover:bg-sea-300/50"
                     >
                       {s.fullName}
                     </Link>
@@ -190,53 +160,5 @@ export default async function RosterPage({ searchParams }: { searchParams: Searc
         </>
       )}
     </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  sub,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  icon: React.ReactNode;
-  tone: Tone;
-}) {
-  const s = TONES[tone];
-  return (
-    <Card className="group relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-      <span aria-hidden className={cn("absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r", s.bar)} />
-      <span
-        aria-hidden
-        className={cn(
-          "pointer-events-none absolute -right-12 -top-12 size-40 rounded-full blur-3xl",
-          s.blob,
-          s.drift,
-        )}
-      />
-      <CardContent className="relative pt-7">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              {label}
-            </p>
-            <p className="mt-2 text-3xl font-bold tracking-tight">{value}</p>
-            {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
-          </div>
-          <div
-            className={cn(
-              "grid size-12 shrink-0 place-items-center rounded-xl shadow-md transition-transform group-hover:scale-110",
-              s.iconBg,
-            )}
-          >
-            {icon}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

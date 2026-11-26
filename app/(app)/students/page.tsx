@@ -4,109 +4,89 @@ import { groupsApi } from "@/lib/api/groups";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageHeader } from "@/components/app/page-header";
+import { SummaryStrip } from "@/components/app/summary-strip";
 import { StudentsFilterBar } from "@/components/students/students-filter-bar";
 import { StudentsTable } from "@/components/students/students-table";
-import { cn } from "@/lib/utils";
 import { getT } from "@/lib/i18n/server";
-import {
-  Plus,
-  UserPlus2,
-  Download,
-  Upload,
-  Users,
-  CircleCheck,
-  CircleSlash,
-  Sparkles,
-} from "lucide-react";
+import { Plus, UserPlus2, Download, Upload, Sparkles } from "lucide-react";
 
-export const metadata = { title: "Students — Academy" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: `${t("students.title")} — Academy` };
+}
 
 type SearchParams = Promise<{
   q?: string;
   groupId?: string;
-  status?: string;
-  archived?: "only" | "include";
+  archived?: string;
 }>;
-
-type Tone = "blue" | "green" | "slate";
-
-const TONES: Record<
-  Tone,
-  { bar: string; blob: string; iconBg: string; valueText: string; drift: string }
-> = {
-  blue: {
-    bar: "from-blue-500 via-blue-500 to-cyan-400",
-    blob: "bg-blue-400/40",
-    iconBg: "bg-gradient-to-br from-blue-500 to-blue-600 text-white",
-    valueText: "",
-    drift: "animate-drift-1",
-  },
-  green: {
-    bar: "from-emerald-500 via-emerald-500 to-teal-400",
-    blob: "bg-emerald-400/40",
-    iconBg: "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white",
-    valueText: "text-emerald-600 dark:text-emerald-400",
-    drift: "animate-drift-2",
-  },
-  slate: {
-    bar: "from-slate-500 via-slate-500 to-slate-400",
-    blob: "bg-slate-400/30",
-    iconBg: "bg-gradient-to-br from-slate-500 to-slate-700 text-white",
-    valueText: "text-slate-500 dark:text-slate-400",
-    drift: "animate-drift-3",
-  },
-};
 
 export default async function StudentsPage({ searchParams }: { searchParams: SearchParams }) {
   const sp = await searchParams;
   const q = sp.q?.trim() ?? "";
   const groupParam = sp.groupId === "__none__" ? "none" : sp.groupId || undefined;
-  const status = sp.status as "active" | "inactive" | undefined;
-  const archivedParam = sp.archived; // undefined = exclude archived (default)
+  // undefined = current students only (the default); "only" = left; "include" = both.
+  const archivedParam =
+    sp.archived === "only" || sp.archived === "include" ? sp.archived : undefined;
 
   const t = await getT();
 
   // 2 parallel fetches:
   //   - filtered list for the table (matches what the user is filtering for)
-  //   - unfiltered list (non-archived) to compute the academy-wide stats banner
-  const [students, allStudents, groups] = await Promise.all([
+  //   - everyone, including those who left, for the stats banner and for the
+  //     "of Y" total — Y must be counted in the same archived mode as X.
+  const [students, everyone, groups] = await Promise.all([
     studentsApi.list({
       q: q || undefined,
       groupId: groupParam,
-      status,
       archived: archivedParam,
     }),
-    studentsApi.list({}),
+    studentsApi.list({ archived: "include" }),
     groupsApi.list(),
   ]);
 
-  const total = allStudents.length;
-  const active = allStudents.filter((s) => s.isActive).length;
-  const inactive = total - active;
-  const isFiltered = !!(q || sp.groupId || status || archivedParam);
+  const current = everyone.filter((s) => !s.archived);
+  const leftCount = everyone.length - current.length;
+  const unassigned = current.filter((s) => !s.groupId).length;
+  const scopeTotal =
+    archivedParam === "only"
+      ? leftCount
+      : archivedParam === "include"
+        ? everyone.length
+        : current.length;
+
+  // q / group narrow the list; the archived mode only picks which pool we're
+  // looking at, so it changes the total rather than counting as a filter.
+  const isFiltered = !!(q || sp.groupId);
+  const hasAnyFilter = isFiltered || !!archivedParam;
+
+  const description = isFiltered
+    ? t("students.desc.showing", { filtered: students.length, total: scopeTotal })
+    : archivedParam === "only"
+      ? leftCount === 1
+        ? t("students.desc.left.one")
+        : t("students.desc.left", { count: leftCount })
+      : archivedParam === "include"
+        ? t("students.desc.withLeft", { count: everyone.length, left: leftCount })
+        : current.length === 1
+          ? t("students.desc.enrolled.one")
+          : t("students.desc.enrolled", { count: current.length });
 
   const exportParams = new URLSearchParams();
   if (q) exportParams.set("q", q);
   if (sp.groupId) exportParams.set("groupId", sp.groupId);
-  if (status) exportParams.set("status", status);
   if (archivedParam) exportParams.set("archived", archivedParam);
   const exportHref = `/api/students/export${
     exportParams.toString() ? `?${exportParams.toString()}` : ""
   }`;
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title={t("students.title")}
-        description={
-          isFiltered
-            ? t("students.desc.showing", { filtered: students.length, total })
-            : total === 1
-              ? t("students.desc.enrolled.one")
-              : t("students.desc.enrolled", { count: total })
-        }
-        actions={
-          <>
+  // Remounts the table whenever the filters change, so a selection made under
+  // one filter can never be bulk-deleted under another.
+  const tableKey = JSON.stringify([q, sp.groupId ?? "", archivedParam ?? ""]);
+
+  // The page has no title bar: its buttons live in the summary card.
+  const pageActions = (
+    <>
             <Button asChild variant="outline">
               <Link href="/students/import">
                 <Upload className="size-4" />
@@ -126,45 +106,43 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
               </Link>
             </Button>
           </>
-        }
+  );
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title={t("students.title")}
+        description={description}
       />
 
-      {/* Stats banner */}
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          label={t("students.stat.total")}
-          value={String(total)}
-          sub={t("students.stat.total.groups", { count: groups.length })}
-          icon={<Users className="size-5" />}
-          tone="blue"
-        />
-        <StatCard
-          label={t("students.stat.active")}
-          value={String(active)}
-          sub={
-            total > 0
-              ? t("students.stat.active.sub", {
-                  percent: Math.round((active / total) * 100),
-                })
-              : undefined
-          }
-          icon={<CircleCheck className="size-5" />}
-          tone="green"
-        />
-        <StatCard
-          label={t("students.stat.inactive")}
-          value={String(inactive)}
-          sub={inactive === 0 ? t("students.stat.inactive.allActive") : undefined}
-          icon={<CircleSlash className="size-5" />}
-          tone="slate"
-        />
-      </div>
+      <SummaryStrip
+        actions={pageActions}
+        items={[
+          {
+            label: t("students.stat.current"),
+            value: current.length,
+            sub: t("students.stat.total.groups", { count: groups.length }),
+          },
+          {
+            label: t("students.stat.unassigned"),
+            value: unassigned,
+            sub:
+              unassigned === 0 && current.length > 0
+                ? t("students.stat.unassigned.none")
+                : undefined,
+          },
+          {
+            label: t("students.stat.left"),
+            value: leftCount,
+            sub: leftCount > 0 ? t("students.stat.left.sub") : undefined,
+          },
+        ]}
+      />
 
       <StudentsFilterBar
         groups={groups.map((g) => ({ id: g.id, name: g.name }))}
         initialQ={q}
         initialGroupId={sp.groupId}
-        initialStatus={status}
         initialArchived={archivedParam}
       />
 
@@ -172,31 +150,22 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
         <Card className="relative overflow-hidden">
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-blue-500 via-fuchsia-500 to-cyan-500"
-          />
-          <span
-            aria-hidden
-            className="pointer-events-none absolute -right-20 -top-20 size-72 animate-drift-1 rounded-full bg-blue-400/15 blur-3xl"
-          />
-          <span
-            aria-hidden
-            className="pointer-events-none absolute -bottom-20 -left-20 size-64 animate-drift-2 rounded-full bg-fuchsia-400/15 blur-3xl"
+            className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sea-700 to-sea-500"
           />
           <CardContent className="relative flex flex-col items-center justify-center gap-4 py-16 text-center">
             <div className="relative">
-              <div className="absolute inset-0 -m-2 animate-pulse-glow rounded-full bg-gradient-to-br from-blue-500 via-fuchsia-500 to-cyan-500 blur-xl" />
-              <div className="relative grid size-20 animate-float-bob place-items-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 shadow-xl shadow-blue-500/30">
-                <UserPlus2 className="size-10 text-white" />
+              <div className="relative grid size-20 place-items-center rounded-full bg-sea-100">
+                <UserPlus2 className="size-10 text-sea-800" />
               </div>
             </div>
             <div className="space-y-1">
-              <h3 className="text-xl font-bold tracking-tight">
-                {isFiltered
+              <h3 className="text-xl font-bold tracking-tight text-sea-900">
+                {hasAnyFilter
                   ? t("students.empty.title.filtered")
                   : t("students.empty.title")}
               </h3>
               <p className="max-w-sm text-sm text-muted-foreground">
-                {isFiltered
+                {hasAnyFilter
                   ? t("students.empty.sub.filtered")
                   : t("students.empty.sub")}
               </p>
@@ -208,7 +177,7 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
                   {t("students.action.add")}
                 </Link>
               </Button>
-              {!isFiltered && (
+              {!hasAnyFilter && (
                 <Button asChild variant="outline">
                   <Link href="/students/import">
                     <Upload className="size-4" />
@@ -218,72 +187,18 @@ export default async function StudentsPage({ searchParams }: { searchParams: Sea
               )}
             </div>
             <p className="flex items-center gap-1.5 pt-3 text-xs text-muted-foreground">
-              <Sparkles className="size-3 text-primary" />
+              <Sparkles className="size-3 text-sea-700" />
               <span>{t("students.empty.importHint")}</span>
             </p>
           </CardContent>
         </Card>
       ) : (
-        <StudentsTable students={students} />
+        <div className="space-y-2">
+          {/* No visible title bar: say how many match when a filter is on. */}
+          {isFiltered && <p className="text-xs text-muted-foreground">{description}</p>}
+          <StudentsTable key={tableKey} students={students} />
+        </div>
       )}
     </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  sub,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  icon: React.ReactNode;
-  tone: Tone;
-}) {
-  const t = TONES[tone];
-  return (
-    <Card className="group relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-      <span
-        aria-hidden
-        className={cn("absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r", t.bar)}
-      />
-      <span
-        aria-hidden
-        className={cn(
-          "pointer-events-none absolute -right-12 -top-12 size-40 rounded-full blur-3xl",
-          t.blob,
-          t.drift,
-        )}
-      />
-      <CardContent className="relative pt-7">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
-              {label}
-            </p>
-            <p
-              className={cn(
-                "mt-2 text-3xl font-bold tracking-tight",
-                t.valueText,
-              )}
-            >
-              {value}
-            </p>
-            {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
-          </div>
-          <div
-            className={cn(
-              "grid size-12 shrink-0 place-items-center rounded-xl shadow-md transition-transform group-hover:scale-110",
-              t.iconBg,
-            )}
-          >
-            {icon}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }

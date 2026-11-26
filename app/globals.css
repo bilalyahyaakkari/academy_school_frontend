@@ -4,77 +4,110 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  /*
+   * Brand palette — the ONLY colours the UI uses (plus red for warnings /
+   * things that need attention). Use the semantic tokens below, or the
+   * `sea-*` utilities (bg-sea-700, text-sea-900, …) when you need a step.
+   *
+   *   sea-950 #04202E   deepest — text, dark surfaces
+   *   sea-900 #0A3C55   sidebar, headings
+   *   sea-800 #0F5E83   primary actions
+   *   sea-700 #1786B4   positive state (paid / present), links, focus
+   *   sea-500 #4FB3DA   secondary accents, partial state
+   *   sea-300 #98D5EE   soft highlights, borders
+   *   sea-100 #E1F2FA   tinted surfaces
+   */
+  --sea-950: #04202e;
+  --sea-900: #0a3c55;
+  --sea-800: #0f5e83;
+  --sea-700: #1786b4;
+  --sea-500: #4fb3da;
+  --sea-300: #98d5ee;
+  --sea-100: #e1f2fa;
+  /* Red: only for warnings, errors, unpaid / overdue, destructive actions. */
+  --alert: #d64545;
 
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --background: color-mix(in oklab, var(--sea-100) 45%, white);
+  --foreground: var(--sea-950);
 
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  --card: #ffffff;
+  --card-foreground: var(--sea-950);
 
-  --primary: oklch(0.55 0.22 264);
-  --primary-foreground: oklch(0.985 0 0);
+  --popover: #ffffff;
+  --popover-foreground: var(--sea-950);
 
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
+  --primary: var(--sea-800);
+  --primary-foreground: #ffffff;
 
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --secondary: var(--sea-100);
+  --secondary-foreground: var(--sea-900);
 
-  --accent: oklch(0.96 0.02 264);
-  --accent-foreground: oklch(0.55 0.22 264);
+  --muted: var(--sea-100);
+  --muted-foreground: color-mix(in oklab, var(--sea-900) 72%, white);
 
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
+  --accent: var(--sea-100);
+  --accent-foreground: var(--sea-900);
 
-  --success: oklch(0.65 0.18 145);
-  --success-foreground: oklch(0.985 0 0);
+  --destructive: var(--alert);
+  --destructive-foreground: #ffffff;
 
-  --warning: oklch(0.78 0.16 75);
-  --warning-foreground: oklch(0.205 0 0);
+  /* "Good" state (paid, present, received) — blue, not green. */
+  --success: var(--sea-700);
+  --success-foreground: #ffffff;
 
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.55 0.22 264);
+  /* "In between" state (partial, pending) — soft blue, not amber. */
+  --warning: var(--sea-300);
+  --warning-foreground: var(--sea-950);
+
+  --border: color-mix(in oklab, var(--sea-300) 45%, white);
+  --input: color-mix(in oklab, var(--sea-300) 70%, white);
+  --ring: var(--sea-700);
+
+  /* Sidebar */
+  --sidebar: var(--sea-900);
+  --sidebar-foreground: var(--sea-100);
+  --sidebar-muted: color-mix(in oklab, var(--sea-100) 70%, var(--sea-900));
+  --sidebar-active: var(--sea-300);
+  --sidebar-active-foreground: var(--sea-950);
+  --sidebar-border: color-mix(in oklab, var(--sea-100) 15%, var(--sea-900));
 
   --radius: 0.625rem;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
+  --background: var(--sea-950);
+  --foreground: var(--sea-100);
 
-  --card: oklch(0.18 0 0);
-  --card-foreground: oklch(0.985 0 0);
+  --card: color-mix(in oklab, var(--sea-900) 70%, var(--sea-950));
+  --card-foreground: var(--sea-100);
 
-  --popover: oklch(0.18 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  --popover: var(--sea-900);
+  --popover-foreground: var(--sea-100);
 
-  --primary: oklch(0.7 0.18 260);
-  --primary-foreground: oklch(0.985 0 0);
+  --primary: var(--sea-500);
+  --primary-foreground: var(--sea-950);
 
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
+  --secondary: var(--sea-900);
+  --secondary-foreground: var(--sea-100);
 
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
+  --muted: var(--sea-900);
+  --muted-foreground: var(--sea-300);
 
-  --accent: oklch(0.32 0.06 260);
-  --accent-foreground: oklch(0.985 0 0);
+  --accent: var(--sea-900);
+  --accent-foreground: var(--sea-100);
 
-  --destructive: oklch(0.65 0.22 27);
-  --destructive-foreground: oklch(0.985 0 0);
+  --destructive: #e26060;
+  --destructive-foreground: #ffffff;
 
-  --success: oklch(0.7 0.18 145);
-  --success-foreground: oklch(0.205 0 0);
+  --success: var(--sea-500);
+  --success-foreground: var(--sea-950);
 
-  --warning: oklch(0.82 0.16 75);
-  --warning-foreground: oklch(0.205 0 0);
+  --warning: var(--sea-300);
+  --warning-foreground: var(--sea-950);
 
-  --border: oklch(1 0 0 / 0.1);
-  --input: oklch(1 0 0 / 0.15);
-  --ring: oklch(0.7 0.18 260);
+  --border: color-mix(in oklab, var(--sea-300) 18%, transparent);
+  --input: color-mix(in oklab, var(--sea-300) 25%, transparent);
+  --ring: var(--sea-500);
 }
 
 @theme inline {
@@ -101,6 +134,22 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  --color-sea-950: var(--sea-950);
+  --color-sea-900: var(--sea-900);
+  --color-sea-800: var(--sea-800);
+  --color-sea-700: var(--sea-700);
+  --color-sea-500: var(--sea-500);
+  --color-sea-300: var(--sea-300);
+  --color-sea-100: var(--sea-100);
+  --color-alert: var(--alert);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted: var(--sidebar-muted);
+  --color-sidebar-active: var(--sidebar-active);
+  --color-sidebar-active-foreground: var(--sidebar-active-foreground);
+  --color-sidebar-border: var(--sidebar-border);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);

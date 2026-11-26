@@ -7,6 +7,7 @@ import {
   Settings,
   CalendarCheck,
   CalendarRange,
+  UserPlus,
 } from "lucide-react";
 import type { TranslationKey } from "@/lib/i18n";
 
@@ -27,6 +28,7 @@ export const NAV_SECTIONS: { labelKey: TranslationKey; items: NavItem[] }[] = [
     labelKey: "nav.section.management",
     items: [
       { href: "/students", labelKey: "nav.students", icon: Users },
+      { href: "/trials", labelKey: "nav.trials", icon: UserPlus },
       { href: "/groups", labelKey: "nav.groups", icon: UsersRound },
       { href: "/roster", labelKey: "nav.roster", icon: CalendarRange },
       { href: "/attendance", labelKey: "nav.attendance", icon: CalendarCheck },

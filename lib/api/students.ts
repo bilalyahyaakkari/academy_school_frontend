@@ -1,17 +1,15 @@
 import { api } from "./client";
-import type { StudentDetail, StudentWithGroup } from "./types";
+import type { SiblingSuggestion, StudentDetail, StudentWithGroup } from "./types";
 
 export const studentsApi = {
   list: (filter: {
     q?: string;
     groupId?: string;
-    status?: string;
     archived?: "exclude" | "only" | "include";
   }) => {
     const qs = new URLSearchParams();
     if (filter.q) qs.set("q", filter.q);
     if (filter.groupId) qs.set("groupId", filter.groupId);
-    if (filter.status) qs.set("status", filter.status);
     if (filter.archived) qs.set("archived", filter.archived);
     const query = qs.toString();
     return api.get<StudentWithGroup[]>(`/students${query ? `?${query}` : ""}`);
@@ -23,7 +21,18 @@ export const studentsApi = {
 
   update: (id: string, body: unknown) => api.put<StudentDetail>(`/students/${id}`, body),
 
-  toggleActive: (id: string) => api.patch<StudentDetail>(`/students/${id}/toggle-active`),
+  /** Move a student to another group (null = no group). */
+  changeGroup: (id: string, groupId: string | null) =>
+    api.patch<StudentDetail>(`/students/${id}/group`, { groupId }),
+
+  /** Students with the same parent phone, not yet linked as siblings. */
+  siblingSuggestions: (id: string) =>
+    api.get<SiblingSuggestion[]>(`/students/${id}/sibling-suggestions`),
+  /** Link two students as siblings (merges families). */
+  linkSibling: (id: string, siblingId: string) =>
+    api.post<StudentDetail>(`/students/${id}/siblings`, { siblingId }),
+  /** Take a student out of their family. */
+  unlinkSibling: (id: string) => api.delete<StudentDetail>(`/students/${id}/family`),
 
   archive: (id: string) => api.patch<StudentDetail>(`/students/${id}/archive`),
   unarchive: (id: string) => api.patch<StudentDetail>(`/students/${id}/unarchive`),

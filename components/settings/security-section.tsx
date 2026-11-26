@@ -17,7 +17,11 @@ export function SecuritySection() {
   const [showNew, setShowNew] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
 
-  const onSubmit = (formData: FormData) => {
+  // onSubmit rather than <form action>: React 19 would clear every field even
+  // when the change fails (e.g. a mistyped confirmation). Clear on success only.
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
     startTransition(async () => {
       const res = await changePasswordAction(formData);
       if (res.success) {
@@ -30,22 +34,18 @@ export function SecuritySection() {
   };
 
   return (
-    <Card className="group relative overflow-hidden transition-all hover:shadow-lg">
+    <Card className="group relative overflow-hidden transition-shadow hover:shadow-md">
       <span
         aria-hidden
-        className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-purple-500 via-fuchsia-500 to-pink-500"
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute -right-16 -top-16 size-44 animate-drift-3 rounded-full bg-fuchsia-400/20 blur-3xl"
+        className="absolute inset-x-0 top-0 h-1 bg-sea-300"
       />
       <CardContent className="relative pt-6">
         <div className="mb-6 flex items-center gap-3">
-          <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-purple-500 to-fuchsia-600 text-white shadow-md">
+          <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-sea-100 text-sea-800">
             <ShieldCheck className="size-5" />
           </div>
           <div>
-            <h2 className="text-lg font-bold tracking-tight">
+            <h2 className="text-lg font-bold tracking-tight text-sea-900">
               {t("settings.security.title")}
             </h2>
             <p className="text-xs text-muted-foreground">
@@ -54,7 +54,7 @@ export function SecuritySection() {
           </div>
         </div>
 
-        <form ref={formRef} action={onSubmit} className="grid gap-4 md:grid-cols-2">
+        <form ref={formRef} onSubmit={onSubmit} className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2 md:col-span-2">
             <Label htmlFor="currentPassword">
               {t("settings.security.current")}
@@ -114,13 +114,16 @@ function PasswordInput({
   show: boolean;
   onToggle: () => void;
 }) {
+  const t = useT();
   return (
     <div className="relative">
       <Input {...rest} type={show ? "text" : "password"} required className="pe-10" />
       <button
         type="button"
         onClick={onToggle}
-        aria-label={show ? "Hide password" : "Show password"}
+        aria-label={
+          show ? t("payments.settings.hidePassword") : t("payments.settings.showPassword")
+        }
         className="absolute end-2 top-1/2 -translate-y-1/2 grid size-7 place-items-center rounded text-muted-foreground hover:text-foreground"
       >
         {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}

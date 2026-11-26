@@ -47,17 +47,31 @@ function detectDelimiter(text: string): "," | ";" | "\t" {
 }
 
 /**
- * Parse CSV text into rows of cells. The delimiter is auto-detected from the
- * first non-empty line unless explicitly passed.
+ * Parse CSV text into records, each tagged with its 1-based record number as a
+ * spreadsheet would show it (blank lines count, so the numbers match the row
+ * numbers the user sees when opening the file in Excel). Blank records are
+ * dropped from the result.
  */
-export function parseCsv(text: string, delimiter?: "," | ";" | "\t"): string[][] {
+function parseCsvRecords(
+  text: string,
+  delimiter?: "," | ";" | "\t",
+): { row: number; cells: string[] }[] {
   if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
   const sep = delimiter ?? detectDelimiter(text);
 
-  const rows: string[][] = [];
+  const rows: { row: number; cells: string[] }[] = [];
   let row: string[] = [];
   let cell = "";
   let inQuotes = false;
+  let recordNo = 1;
+
+  const endRecord = () => {
+    row.push(cell);
+    if (row.some((v) => v !== "")) rows.push({ row: recordNo, cells: row });
+    recordNo++;
+    row = [];
+    cell = "";
+  };
 
   for (let i = 0; i < text.length; i++) {
     const c = text[i];
@@ -79,32 +93,48 @@ export function parseCsv(text: string, delimiter?: "," | ";" | "\t"): string[][]
       cell = "";
     } else if (c === "\r" || c === "\n") {
       if (c === "\r" && text[i + 1] === "\n") i++;
-      row.push(cell);
-      if (row.some((v) => v !== "")) rows.push(row);
-      row = [];
-      cell = "";
+      endRecord();
     } else {
       cell += c;
     }
   }
-  if (cell !== "" || row.length > 0) {
-    row.push(cell);
-    if (row.some((v) => v !== "")) rows.push(row);
-  }
+  if (cell !== "" || row.length > 0) endRecord();
   return rows;
+}
+
+/**
+ * Parse CSV text into rows of cells. The delimiter is auto-detected from the
+ * first non-empty line unless explicitly passed.
+ */
+export function parseCsv(text: string, delimiter?: "," | ";" | "\t"): string[][] {
+  return parseCsvRecords(text, delimiter).map((r) => r.cells);
+}
+
+/**
+ * Parse CSV with first-row headers into objects, each tagged with its row
+ * number in the file (header = row 1 when the file starts with it).
+ */
+export function parseCsvRows(text: string): {
+  headers: string[];
+  rows: { row: number; data: Record<string, string> }[];
+} {
+  const records = parseCsvRecords(text);
+  if (records.length === 0) return { headers: [], rows: [] };
+  const [header, ...body] = records;
+  const headers = header.cells.map((h) => h.trim());
+  return {
+    headers,
+    rows: body.map(({ row, cells }) => {
+      const data: Record<string, string> = {};
+      headers.forEach((h, i) => {
+        data[h] = (cells[i] ?? "").trim();
+      });
+      return { row, data };
+    }),
+  };
 }
 
 /** Parse CSV with first-row headers into an array of objects. */
 export function parseCsvWithHeaders(text: string): Record<string, string>[] {
-  const rows = parseCsv(text);
-  if (rows.length === 0) return [];
-  const [header, ...body] = rows;
-  const headers = header.map((h) => h.trim());
-  return body.map((cells) => {
-    const obj: Record<string, string> = {};
-    headers.forEach((h, i) => {
-      obj[h] = (cells[i] ?? "").trim();
-    });
-    return obj;
-  });
+  return parseCsvRows(text).rows.map((r) => r.data);
 }

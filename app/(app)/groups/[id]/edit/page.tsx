@@ -4,6 +4,7 @@ import { ApiError } from "@/lib/api/client";
 import { GroupForm } from "@/components/groups/group-form";
 import { updateGroup } from "@/lib/actions/groups";
 import { PageHeader } from "@/components/app/page-header";
+import { getT } from "@/lib/i18n/server";
 
 type Params = Promise<{ id: string }>;
 
@@ -19,13 +20,14 @@ export default async function EditGroupPage({ params }: { params: Params }) {
   }
 
   const action = updateGroup.bind(null, id);
+  const t = await getT();
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Edit ${group.name}`}
+        title={t("groups.edit.title", { name: group.name })}
         backHref={`/groups/${id}`}
-        backLabel={`Back to ${group.name}`}
+        backLabel={t("groups.backToName", { name: group.name })}
       />
       <GroupForm
         action={action}
@@ -38,7 +40,7 @@ export default async function EditGroupPage({ params }: { params: Params }) {
           maxCapacity: group.maxCapacity,
           coachName: group.coachName,
         }}
-        submitLabel="Save changes"
+        submitLabel={t("groups.form.save")}
       />
     </div>
   );

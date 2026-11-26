@@ -11,20 +11,23 @@ import { Loader2, MessageCircle, RotateCcw } from "lucide-react";
 import {
   applyTemplate,
   ARABIC_MONTH_NAMES,
+  currentYearMonth,
   DEFAULT_WHATSAPP_TEMPLATE,
+  formatCurrency,
 } from "@/lib/utils";
 import { useT } from "@/lib/i18n/client";
+import type { TranslationKey } from "@/lib/i18n";
+import { useClientTime, WhatsAppBubble } from "@/components/payments/whatsapp-preview";
 
-const SAMPLE_MONTH = new Date().getMonth() + 1;
 const SAMPLE_AMOUNT = 25;
 const SAMPLE_STUDENT = "علي حسن";
 
-const PLACEHOLDERS = [
-  { token: "{month}", desc: "Arabic month name" },
-  { token: "{year}", desc: "4-digit year" },
-  { token: "{amount}", desc: "fee amount" },
-  { token: "{student}", desc: "student name" },
-  { token: "{academy}", desc: "academy name" },
+const PLACEHOLDERS: { token: string; desc: TranslationKey }[] = [
+  { token: "{month}", desc: "payments.whatsapp.ph.month" },
+  { token: "{year}", desc: "payments.whatsapp.ph.year" },
+  { token: "{amount}", desc: "payments.whatsapp.ph.amount" },
+  { token: "{student}", desc: "payments.whatsapp.ph.student" },
+  { token: "{academy}", desc: "payments.whatsapp.ph.academy" },
 ];
 
 export function WhatsAppSection({
@@ -43,19 +46,28 @@ export function WhatsAppSection({
     defaults.whatsappTemplate ?? DEFAULT_WHATSAPP_TEMPLATE,
   );
 
+  const sample = currentYearMonth();
+  const time = useClientTime();
+
   const previewMessage = applyTemplate(template, {
-    month: ARABIC_MONTH_NAMES[SAMPLE_MONTH - 1],
-    year: String(new Date().getFullYear()),
+    month: ARABIC_MONTH_NAMES[sample.month - 1],
+    year: String(sample.year),
     amount: SAMPLE_AMOUNT.toFixed(2),
     student: SAMPLE_STUDENT,
     academy: defaults.academyName,
   });
 
-  const onSubmit = (formData: FormData) => {
+  const isCustom = template.trim() !== DEFAULT_WHATSAPP_TEMPLATE.trim();
+
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData();
     formData.set("academyName", defaults.academyName);
     formData.set("defaultFee", String(defaults.defaultFee));
     formData.set("whatsappCountry", defaults.whatsappCountry);
-    formData.set("whatsappTemplate", template);
+    // Same text as the built-in default (e.g. after "Reset") → send empty,
+    // which is stored as null: "use the default", not a frozen copy of it.
+    formData.set("whatsappTemplate", isCustom ? template : "");
     startTransition(async () => {
       const res = await updateSettings(formData);
       if (res.success) toast.success(t("settings.whatsapp.toast.saved"));
@@ -72,25 +84,19 @@ export function WhatsAppSection({
     toast.info(t("settings.whatsapp.toast.reset"));
   };
 
-  const isCustom = template.trim() !== DEFAULT_WHATSAPP_TEMPLATE.trim();
-
   return (
-    <Card className="group relative overflow-hidden transition-all hover:shadow-lg">
+    <Card className="group relative overflow-hidden transition-shadow hover:shadow-md">
       <span
         aria-hidden
-        className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-emerald-500 to-teal-400"
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute -right-16 -top-16 size-44 animate-drift-2 rounded-full bg-emerald-400/20 blur-3xl"
+        className="absolute inset-x-0 top-0 h-1 bg-sea-700"
       />
       <CardContent className="relative pt-6">
         <div className="mb-6 flex items-center gap-3">
-          <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-md">
+          <div className="grid size-11 shrink-0 place-items-center rounded-xl bg-sea-100 text-sea-800">
             <MessageCircle className="size-5" />
           </div>
           <div className="flex-1">
-            <h2 className="text-lg font-bold tracking-tight">
+            <h2 className="text-lg font-bold tracking-tight text-sea-900">
               {t("settings.whatsapp.title")}
             </h2>
             <p className="text-xs text-muted-foreground">
@@ -98,13 +104,13 @@ export function WhatsAppSection({
             </p>
           </div>
           {isCustom && (
-            <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
+            <span className="rounded-full bg-sea-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-widest text-sea-900">
               {t("settings.whatsapp.customBadge")}
             </span>
           )}
         </div>
 
-        <form action={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-4">
           <div className="grid gap-6 lg:grid-cols-[1fr_minmax(0,1fr)]">
             {/* Editor */}
             <div className="space-y-3">
@@ -140,8 +146,9 @@ export function WhatsAppSection({
                       key={p.token}
                       type="button"
                       onClick={() => insertPlaceholder(p.token)}
-                      title={p.desc}
-                      className="rounded-md border border-border bg-card px-2 py-1 font-mono text-xs transition-colors hover:border-primary/50 hover:bg-primary/5 hover:text-primary"
+                      title={t(p.desc)}
+                      aria-label={`${p.token} — ${t(p.desc)}`}
+                      className="rounded-md border border-border bg-card px-2 py-1 font-mono text-xs transition-colors hover:border-sea-300 hover:bg-sea-100 hover:text-sea-900"
                     >
                       {p.token}
                     </button>
@@ -155,36 +162,15 @@ export function WhatsAppSection({
               <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
                 {t("settings.whatsapp.preview")}
               </p>
-              <div className="relative rounded-2xl bg-[#e7ddd2] p-4 shadow-inner dark:bg-slate-800">
-                <div
-                  aria-hidden
-                  className="pointer-events-none absolute inset-0 rounded-2xl opacity-[0.06]"
-                  style={{
-                    backgroundImage:
-                      "radial-gradient(circle at 4px 4px, currentColor 1px, transparent 0)",
-                    backgroundSize: "12px 12px",
-                  }}
-                />
-                <div className="relative ml-auto max-w-[90%] rounded-2xl rounded-tr-sm bg-[#dcf8c6] p-3 text-sm text-slate-900 shadow dark:bg-emerald-700 dark:text-white">
-                  <p className="whitespace-pre-wrap text-right" dir="rtl">
-                    {renderWhatsAppFormatting(previewMessage)}
-                  </p>
-                  <p className="mt-1 text-right text-[10px] text-slate-600 dark:text-emerald-200">
-                    ✓✓{" "}
-                    {new Date().toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </div>
-                <p className="relative mt-3 text-center text-[10px] text-slate-600 dark:text-slate-400">
-                  {t("settings.whatsapp.sampleNote", {
-                    month: ARABIC_MONTH_NAMES[SAMPLE_MONTH - 1],
-                    amount: `$${SAMPLE_AMOUNT}.00`,
-                    student: SAMPLE_STUDENT,
-                  })}
-                </p>
-              </div>
+              <WhatsAppBubble
+                text={previewMessage}
+                time={time}
+                footer={t("settings.whatsapp.sampleNote", {
+                  month: ARABIC_MONTH_NAMES[sample.month - 1],
+                  amount: formatCurrency(SAMPLE_AMOUNT),
+                  student: SAMPLE_STUDENT,
+                })}
+              />
             </div>
           </div>
 
@@ -198,27 +184,4 @@ export function WhatsAppSection({
       </CardContent>
     </Card>
   );
-}
-
-/**
- * Lightweight WhatsApp formatting renderer for the preview only — turns
- * `*bold*` into actual bold text inside the chat bubble.
- */
-function renderWhatsAppFormatting(text: string): React.ReactNode {
-  const parts: React.ReactNode[] = [];
-  const re = /\*([^*\n]+?)\*/g;
-  let last = 0;
-  let match: RegExpExecArray | null;
-  let i = 0;
-  while ((match = re.exec(text)) !== null) {
-    if (match.index > last) parts.push(text.slice(last, match.index));
-    parts.push(
-      <strong key={`b-${i++}`} className="font-bold">
-        {match[1]}
-      </strong>,
-    );
-    last = match.index + match[0].length;
-  }
-  if (last < text.length) parts.push(text.slice(last));
-  return parts;
 }

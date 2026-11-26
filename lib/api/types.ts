@@ -65,6 +65,8 @@ export type Student = {
   /** Per-student override of the group's monthly fee. Null = inherit. */
   monthlyFee: number | null;
   notes: string | null;
+  /** Siblings share a familyId (null = no linked siblings). */
+  familyId: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -79,6 +81,8 @@ export type Payment = {
   month: number;
   year: number;
   amount: number;
+  /** Sibling discount already taken off `amount` (0 = none). */
+  discount: number;
   status: PaymentStatus;
   paidAmount: number;
   paymentDate: string | null;
@@ -88,10 +92,21 @@ export type Payment = {
   updatedAt: string;
 };
 
+export type SiblingSummary = {
+  id: string;
+  fullName: string;
+  archived: boolean;
+  group: GroupSummary | null;
+};
+
 export type StudentDetail = Student & {
   group: Group | null;
   payments: Payment[];
+  /** Linked siblings (same familyId), excluding this student. */
+  siblings: SiblingSummary[];
 };
+
+export type SiblingSuggestion = SiblingSummary & { phoneNumber: string | null };
 
 export type GroupDetail = Group & {
   students: Student[];
@@ -116,6 +131,11 @@ export type Settings = {
   whatsappCountry: string;
   /** Custom reminder template. Null = use the built-in default. */
   whatsappTemplate: string | null;
+  /** Custom WhatsApp receipt template; null = built-in default. */
+  whatsappReceiptTemplate: string | null;
+  /** Sibling discount on monthly fees (2nd child onwards). */
+  siblingDiscountType: "NONE" | "PERCENT" | "FIXED";
+  siblingDiscountValue: number;
   updatedAt: string;
 };
 
@@ -139,7 +159,8 @@ export type Uniform = {
 };
 
 export type UniformWithStudent = Uniform & {
-  student: { id: string; fullName: string; phoneNumber: string | null };
+  /** `archived` = the student has left; their unpaid uniforms still count. */
+  student: { id: string; fullName: string; phoneNumber: string | null; archived: boolean };
 };
 
 // ---------- Monthly roster ----------
@@ -215,6 +236,9 @@ export type AttendanceSessionSummary = {
   id: string;
   date: string;
   notes: string | null;
+  /** Cancelled sessions (rain, holiday…) never count as absences. */
+  cancelled: boolean;
+  cancelReason: string | null;
   presentCount: number;
   totalCount: number;
 };
@@ -257,9 +281,99 @@ export type AttendanceChecklist = {
   presentCount: number;
   /** True until the checklist has been saved for the first time. */
   isNew: boolean;
+  /** Cancelled (rain, holiday…): kept for the record, never an absence. */
+  cancelled: boolean;
+  cancelReason: string | null;
+  /** Children coming to try this group on this day (not students). */
+  trials: { id: string; fullName: string; phoneNumber: string | null; status: TrialStatus }[];
 };
 
 export type LoginResponse = {
   accessToken: string;
   user: { id: string; email: string; name: string | null };
+};
+
+/** GET /payments/history — capped list plus the real total. */
+export type PaymentHistory = {
+  rows: PaymentWithStudent[];
+  total: number;
+  /** True when more rows matched than were returned (cap: 500). */
+  truncated: boolean;
+};
+
+/** GET /payments/stats?year= — aggregates computed in the database. */
+export type PaymentStats = {
+  year: number;
+  /** Money received on invoices of `year`. */
+  revenue: number;
+  /** Invoices of `year` with any money received. */
+  paymentsCount: number;
+  /** Latest payments received (any year), newest first. */
+  recent: PaymentWithStudent[];
+};
+
+// ---------- Receipts ----------
+
+/** GET /payments/:id/receipt and /uniforms/:id/receipt */
+export type Receipt = {
+  kind: "FEE" | "UNIFORM";
+  student: { id: string; fullName: string; phoneNumber: string | null };
+  /** FEE only */
+  month?: number;
+  year?: number;
+  /** UNIFORM only */
+  size?: string;
+  total: number;
+  paid: number;
+  remaining: number;
+  /** The latest money received (null when nothing was paid). */
+  last: { amount: number; date: string; method: PaymentMethod } | null;
+};
+
+// ---------- Daily cash report ----------
+
+export type LedgerTransaction = {
+  id: string;
+  kind: "FEE" | "UNIFORM";
+  /** Negative = an undo / correction. */
+  amount: number;
+  method: PaymentMethod;
+  date: string;
+  note: string | null;
+  createdAt: string;
+  student: { id: string; fullName: string };
+  payment: { id: string; month: number; year: number } | null;
+  uniform: { id: string; size: string } | null;
+};
+
+/** GET /reports/daily?date= (or ?from=&to=) */
+export type DailyReport = {
+  from: string;
+  to: string;
+  total: number;
+  count: number;
+  byMethod: Record<PaymentMethod, number>;
+  byKind: { FEE: number; UNIFORM: number };
+  transactions: LedgerTransaction[];
+};
+
+// ---------- Trials ----------
+
+export type TrialStatus = "SCHEDULED" | "ATTENDED" | "NO_SHOW" | "JOINED" | "DECLINED";
+
+export type Trial = {
+  id: string;
+  fullName: string;
+  phoneNumber: string | null;
+  dateOfBirth: string | null;
+  groupId: string | null;
+  trialDate: string;
+  status: TrialStatus;
+  notes: string | null;
+  /** Set once the trial turned into a real student. */
+  studentId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  group: GroupSummary | null;
+  student: { id: string; fullName: string } | null;
 };

@@ -7,12 +7,12 @@ import { paymentsApi } from "./payments";
  * Lives here so the page itself doesn't fan out manually.
  */
 export async function fetchDashboardData(year: number, month: number) {
-  const [students, groups, monthRows, recent] = await Promise.all([
-    studentsApi.list({ status: "active" }),
+  const [students, groups, monthRows, stats] = await Promise.all([
+    studentsApi.list({}),
     groupsApi.list(),
     paymentsApi.monthGrid(year, month),
-    paymentsApi.history({}), // last 500, descending
+    paymentsApi.stats(year),
   ]);
 
-  return { students, groups, monthRows, recent };
+  return { students, groups, monthRows, recent: stats.recent };
 }

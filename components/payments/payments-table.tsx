@@ -13,17 +13,28 @@ import {
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { markPaymentUnpaid } from "@/lib/actions/payments";
 import { PaymentEditDialog } from "./payment-edit-dialog";
 import { AddPaymentDialog } from "./add-payment-dialog";
+import { useReceiptSender } from "./receipt-dialog";
 import { toast } from "sonner";
-import { CreditCard, RotateCcw, Pencil, Loader2 } from "lucide-react";
+import { CreditCard, RotateCcw, Pencil, Loader2, MessageCircle } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useT } from "@/lib/i18n/client";
 
 type Payment = {
   id: string;
   amount: number;
+  /** Sibling discount already taken off `amount` (0 = none). */
+  discount: number;
   paidAmount: number;
   status: "PAID" | "UNPAID" | "PARTIAL";
   paymentMethod: "CASH" | "BANK_TRANSFER" | "OTHER" | null;
@@ -39,33 +50,31 @@ type Row = {
   payment: Payment | null;
 };
 
-export function PaymentsTable({
-  rows,
-  year: _year,
-  month: _month,
-}: {
-  rows: Row[];
-  year: number;
-  month: number;
-}) {
+export function PaymentsTable({ rows }: { rows: Row[] }) {
   const t = useT();
-  const [pendingId, setPendingId] = useState<string | null>(null);
   const [editing, setEditing] = useState<Payment | null>(null);
   const [recordingFor, setRecordingFor] = useState<{
     payment: Payment;
     studentName: string;
   } | null>(null);
-  const [, startTransition] = useTransition();
+  // Undo erases money that was actually taken, so it always asks first.
+  const [undoing, setUndoing] = useState<{ payment: Payment; studentName: string } | null>(
+    null,
+  );
+  const [undoPending, startUndo] = useTransition();
+  const receipts = useReceiptSender();
 
-  const undoPaid = (row: Row) => {
-    if (!row.payment) return;
-    const id = row.payment.id;
-    setPendingId(id);
-    startTransition(async () => {
+  const confirmUndo = () => {
+    if (!undoing) return;
+    const id = undoing.payment.id;
+    startUndo(async () => {
       const res = await markPaymentUnpaid(id);
-      setPendingId(null);
-      if (res.success === false) toast.error(res.error);
-      else toast.success("Reset to unpaid");
+      if (res.success === false) {
+        toast.error(res.error);
+        return;
+      }
+      toast.success(t("payments.undo.toast"));
+      setUndoing(null);
     });
   };
 
@@ -85,19 +94,31 @@ export function PaymentsTable({
           {t("payments.action.record")}
         </Button>
       )}
-      {r.payment && r.payment.status === "PAID" && (
+      {r.payment && r.payment.status !== "UNPAID" && (
         <Button
           size="sm"
           variant="outline"
-          onClick={() => undoPaid(r)}
-          disabled={pendingId === r.payment.id}
+          onClick={() => setUndoing({ payment: r.payment!, studentName: r.studentName })}
+          disabled={undoPending && undoing?.payment.id === r.payment.id}
         >
-          {pendingId === r.payment.id ? (
+          <RotateCcw className="size-4" />
+          {t("payments.action.undo")}
+        </Button>
+      )}
+      {r.payment && r.payment.paidAmount > 0 && (
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={() => receipts.send("FEE", r.payment!.id)}
+          disabled={receipts.loadingId === r.payment.id}
+          aria-label={t("payments.receipt.send")}
+          title={t("payments.receipt.send")}
+        >
+          {receipts.loadingId === r.payment.id ? (
             <Loader2 className="size-4 animate-spin" />
           ) : (
-            <RotateCcw className="size-4" />
+            <MessageCircle className="size-4" />
           )}
-          {t("payments.action.undo")}
         </Button>
       )}
       {r.payment && (
@@ -122,7 +143,7 @@ export function PaymentsTable({
       return <Badge variant="success">{t("common.paid")}</Badge>;
     if (r.payment.status === "PARTIAL")
       return <Badge variant="warning">{t("common.partial")}</Badge>;
-    return <Badge variant="secondary">{t("common.unpaid")}</Badge>;
+    return <Badge variant="alert">{t("common.unpaid")}</Badge>;
   };
 
   return (
@@ -224,9 +245,47 @@ export function PaymentsTable({
           studentName={recordingFor.studentName}
           total={recordingFor.payment.amount}
           alreadyPaid={recordingFor.payment.paidAmount}
+          existingNotes={recordingFor.payment.notes}
           onClose={() => setRecordingFor(null)}
         />
       )}
+
+      {receipts.dialog}
+
+      <Dialog
+        open={undoing !== null}
+        onOpenChange={(o) => {
+          if (!o && !undoPending) setUndoing(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {t("payments.undo.title", { name: undoing?.studentName ?? "" })}
+            </DialogTitle>
+            <DialogDescription>
+              {undoing && undoing.payment.paidAmount > 0
+                ? t("payments.undo.desc", {
+                    amount: formatCurrency(undoing.payment.paidAmount),
+                  })
+                : t("payments.undo.descZero")}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setUndoing(null)} disabled={undoPending}>
+              {t("common.cancel")}
+            </Button>
+            <Button variant="destructive" onClick={confirmUndo} disabled={undoPending}>
+              {undoPending && <Loader2 className="size-4 animate-spin" />}
+              {undoing && undoing.payment.paidAmount > 0
+                ? t("payments.undo.confirm", {
+                    amount: formatCurrency(undoing.payment.paidAmount),
+                  })
+                : t("payments.undo.confirmZero")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -259,6 +318,11 @@ function PaymentProgress({ payment }: { payment: Payment }) {
           style={{ width: `${pct}%` }}
         />
       </div>
+      {payment.discount > 0 && (
+        <p className="text-[11px] text-muted-foreground">
+          {t("payments.discount.note", { amount: formatCurrency(payment.discount) })}
+        </p>
+      )}
       {remaining > 0 && payment.paidAmount > 0 && (
         <p className="text-[11px] text-destructive">
           {t("payments.progress.remaining", {

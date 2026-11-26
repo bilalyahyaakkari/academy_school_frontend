@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { uniformsApi } from "@/lib/api/uniforms";
 import { ApiError } from "@/lib/api/client";
+import { getT } from "@/lib/i18n/server";
+import type { TranslationKey } from "@/lib/i18n";
 
 type ActionResult = { success: true } | { success: false; error: string };
 
@@ -26,15 +28,18 @@ function buildPayload(formData: FormData) {
   };
 }
 
-function errMsg(err: unknown, fallback: string): string {
-  return err instanceof ApiError ? err.message : fallback;
+/** The backend's message when it gave one, else a translated fallback. */
+async function errMsg(err: unknown, fallback: TranslationKey): Promise<string> {
+  if (err instanceof ApiError) return err.message;
+  const t = await getT();
+  return t(fallback);
 }
 
 export async function createUniform(formData: FormData): Promise<ActionResult> {
   try {
     await uniformsApi.create(buildPayload(formData));
   } catch (err) {
-    return { success: false, error: errMsg(err, "Failed to create uniform order") };
+    return { success: false, error: await errMsg(err, "uniforms.err.create") };
   }
   revalidatePath("/uniforms");
   return { success: true };
@@ -47,7 +52,7 @@ export async function updateUniform(
   try {
     await uniformsApi.update(id, buildPayload(formData));
   } catch (err) {
-    return { success: false, error: errMsg(err, "Failed to update uniform order") };
+    return { success: false, error: await errMsg(err, "uniforms.err.update") };
   }
   revalidatePath("/uniforms");
   return { success: true };
@@ -57,9 +62,10 @@ export async function toggleUniformPaid(id: string): Promise<ActionResult> {
   try {
     await uniformsApi.togglePaid(id);
   } catch (err) {
-    return { success: false, error: errMsg(err, "Failed to toggle paid status") };
+    return { success: false, error: await errMsg(err, "uniforms.err.togglePaid") };
   }
   revalidatePath("/uniforms");
+  revalidatePath("/payments/daily");
   return { success: true };
 }
 
@@ -69,14 +75,21 @@ export async function addUniformPayment(
 ): Promise<ActionResult> {
   const amount = Number(formData.get("amount") ?? 0);
   if (!Number.isFinite(amount) || amount <= 0) {
-    return { success: false, error: "Enter a positive amount" };
+    const t = await getT();
+    return { success: false, error: t("uniforms.err.positiveAmount") };
   }
+  const rawMethod = formData.get("paymentMethod");
+  const paymentMethod =
+    rawMethod === "CASH" || rawMethod === "BANK_TRANSFER" || rawMethod === "OTHER"
+      ? rawMethod
+      : undefined;
   try {
-    await uniformsApi.addPayment(id, { amount });
+    await uniformsApi.addPayment(id, { amount, paymentMethod });
   } catch (err) {
-    return { success: false, error: errMsg(err, "Failed to record payment") };
+    return { success: false, error: await errMsg(err, "uniforms.err.payment") };
   }
   revalidatePath("/uniforms");
+  revalidatePath("/payments/daily");
   return { success: true };
 }
 
@@ -86,7 +99,7 @@ export async function toggleUniformReceived(id: string): Promise<ActionResult> {
   } catch (err) {
     return {
       success: false,
-      error: errMsg(err, "Failed to toggle received status"),
+      error: await errMsg(err, "uniforms.err.toggleReceived"),
     };
   }
   revalidatePath("/uniforms");
@@ -97,7 +110,7 @@ export async function deleteUniform(id: string): Promise<ActionResult> {
   try {
     await uniformsApi.remove(id);
   } catch (err) {
-    return { success: false, error: errMsg(err, "Failed to delete uniform order") };
+    return { success: false, error: await errMsg(err, "uniforms.err.delete") };
   }
   revalidatePath("/uniforms");
   return { success: true };
@@ -106,12 +119,15 @@ export async function deleteUniform(id: string): Promise<ActionResult> {
 export async function bulkDeleteUniforms(
   ids: string[],
 ): Promise<{ success: true; deleted: number } | { success: false; error: string }> {
-  if (ids.length === 0) return { success: false, error: "No uniforms selected" };
+  if (ids.length === 0) {
+    const t = await getT();
+    return { success: false, error: t("uniforms.err.noneSelected") };
+  }
   try {
     const res = await uniformsApi.bulkDelete(ids);
     revalidatePath("/uniforms");
     return { success: true, deleted: res.deleted };
   } catch (err) {
-    return { success: false, error: errMsg(err, "Failed to delete uniforms") };
+    return { success: false, error: await errMsg(err, "uniforms.err.bulkDelete") };
   }
 }

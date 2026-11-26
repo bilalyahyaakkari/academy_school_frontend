@@ -14,7 +14,14 @@ export const LOCALE_LABELS: Record<Locale, string> = {
   ar: "العربية",
 };
 
-export const dict = {
+import { coreStrings } from "./extra/core";
+import { paymentsStrings } from "./extra/payments";
+import { studentsStrings } from "./extra/students";
+import { uniformsStrings } from "./extra/uniforms";
+import { groupsStrings } from "./extra/groups";
+import { attendanceStrings } from "./extra/attendance";
+
+const baseDict = {
   en: {
     // Nav sections
     "nav.section.overview": "Overview",
@@ -46,8 +53,6 @@ export const dict = {
     "common.reset": "Reset",
     "common.loading": "Loading…",
     "common.language": "Language",
-    "common.active": "Active",
-    "common.inactive": "Inactive",
     "common.paid": "Paid",
     "common.unpaid": "Unpaid",
     "common.partial": "Partial",
@@ -59,7 +64,6 @@ export const dict = {
     "dashboard.stat.collected.sub": "of {expected} expected",
     "dashboard.stat.pending": "Pending",
     "dashboard.stat.pending.sub": "{count} unpaid",
-    "dashboard.stat.activeStudents": "Active students",
     "dashboard.section.studentsPerGroup": "Students per group",
     "dashboard.section.recentPayments": "Recent payments",
     "dashboard.recent.empty": "No payments recorded yet.",
@@ -86,18 +90,11 @@ export const dict = {
     "students.action.exportExcel": "Export Excel",
     "students.stat.total": "Total students",
     "students.stat.total.groups": "{count} groups",
-    "students.stat.active": "Active",
-    "students.stat.active.sub": "{percent}% of roster",
-    "students.stat.inactive": "Inactive",
-    "students.stat.inactive.allActive": "Everyone's active 🎉",
     "students.filter.all": "All",
-    "students.filter.active": "Active",
-    "students.filter.inactive": "Inactive",
     "students.filter.allGroups": "All groups",
     "students.filter.unassigned": "— Unassigned —",
     "students.filter.allSchools": "All schools",
     "students.filter.school": "School",
-    "students.filter.archive.activeOnly": "Active only",
     "students.filter.archive.all": "Active + archived",
     "students.filter.archive.onlyArchived": "Archived only",
     "students.archive.badge": "Archived",
@@ -179,7 +176,6 @@ export const dict = {
     "uniforms.bulk.back": "Back to uniforms",
     "uniforms.bulk.search": "Search students…",
     "uniforms.bulk.filter.all": "All students",
-    "uniforms.bulk.filter.active": "Active only",
     "uniforms.bulk.filter.noOrder": "No order yet",
     "uniforms.bulk.selectAll": "Select all {count}",
     "uniforms.bulk.deselectAll": "Deselect all",
@@ -285,14 +281,10 @@ export const dict = {
     // Settings page
     "settings.title": "Settings",
     "settings.desc": "Configure your academy, defaults, and admin account.",
-    "settings.stat.activeStudents": "Active students",
-    "settings.stat.activeStudents.sub": "{count} total",
     "settings.stat.groups": "Groups",
     "settings.stat.payments": "Payments",
     "settings.stat.payments.sub": "all-time records",
     "settings.stat.revenue": "Revenue {year}",
-    "settings.about.builtFor": "Built for {name}",
-    "settings.about.tagline": "A focused admin console for tracking students, groups, payments, and uniforms — without the spreadsheets.",
     // General section
     "settings.general.title": "General",
     "settings.general.desc": "Academy identity, default fees, and WhatsApp country code.",
@@ -443,8 +435,6 @@ export const dict = {
     "common.reset": "إعادة تعيين",
     "common.loading": "جارٍ التحميل…",
     "common.language": "اللغة",
-    "common.active": "نشط",
-    "common.inactive": "غير نشط",
     "common.paid": "مدفوع",
     "common.unpaid": "غير مدفوع",
     "common.partial": "جزئي",
@@ -456,7 +446,6 @@ export const dict = {
     "dashboard.stat.collected.sub": "من أصل {expected} متوقّع",
     "dashboard.stat.pending": "متبقّي",
     "dashboard.stat.pending.sub": "{count} غير مدفوع",
-    "dashboard.stat.activeStudents": "الطلاب النشطون",
     "dashboard.section.studentsPerGroup": "الطلاب حسب المجموعة",
     "dashboard.section.recentPayments": "آخر المدفوعات",
     "dashboard.recent.empty": "لا توجد مدفوعات بعد.",
@@ -483,18 +472,11 @@ export const dict = {
     "students.action.exportExcel": "تصدير Excel",
     "students.stat.total": "إجمالي الطلاب",
     "students.stat.total.groups": "{count} مجموعات",
-    "students.stat.active": "نشطون",
-    "students.stat.active.sub": "{percent}% من القائمة",
-    "students.stat.inactive": "غير نشطين",
-    "students.stat.inactive.allActive": "الجميع نشط 🎉",
     "students.filter.all": "الكل",
-    "students.filter.active": "نشط",
-    "students.filter.inactive": "غير نشط",
     "students.filter.allGroups": "جميع المجموعات",
     "students.filter.unassigned": "— بدون مجموعة —",
     "students.filter.allSchools": "جميع المدارس",
     "students.filter.school": "المدرسة",
-    "students.filter.archive.activeOnly": "النشطون فقط",
     "students.filter.archive.all": "النشطون + المؤرشفون",
     "students.filter.archive.onlyArchived": "المؤرشفون فقط",
     "students.archive.badge": "مؤرشف",
@@ -576,7 +558,6 @@ export const dict = {
     "uniforms.bulk.back": "العودة إلى الأزياء",
     "uniforms.bulk.search": "ابحث عن طلاب…",
     "uniforms.bulk.filter.all": "كل الطلاب",
-    "uniforms.bulk.filter.active": "النشطون فقط",
     "uniforms.bulk.filter.noOrder": "بدون طلب بعد",
     "uniforms.bulk.selectAll": "تحديد الكل ({count})",
     "uniforms.bulk.deselectAll": "إلغاء التحديد",
@@ -682,14 +663,10 @@ export const dict = {
     // Settings page
     "settings.title": "الإعدادات",
     "settings.desc": "أعدّ الأكاديمية، القيم الافتراضية، وحساب المدير.",
-    "settings.stat.activeStudents": "الطلاب النشطون",
-    "settings.stat.activeStudents.sub": "إجمالي {count}",
     "settings.stat.groups": "المجموعات",
     "settings.stat.payments": "المدفوعات",
     "settings.stat.payments.sub": "السجلات منذ البداية",
     "settings.stat.revenue": "إيرادات {year}",
-    "settings.about.builtFor": "صُمّم لـ {name}",
-    "settings.about.tagline": "لوحة إدارية مركّزة لتتبّع الطلاب والمجموعات والمدفوعات والأزياء — دون جداول البيانات.",
     // General section
     "settings.general.title": "إعدادات عامة",
     "settings.general.desc": "هوية الأكاديمية، الرسوم الافتراضية، ورمز دولة واتساب.",
@@ -808,6 +785,31 @@ export const dict = {
     "attendance.delete.desc": "الحضور المسجّل بتاريخ {date} رح ينشال. ما في رجعة.",
     "attendance.toast.deleted": "انحذفت اللائحة",
     "attendance.student.thisMonth": "حضر {count} مرات بـ {month}",
+  },
+} as const;
+
+/**
+ * Base strings plus the per-area files in ./extra (split so different parts of
+ * the app can add strings without editing one giant object).
+ */
+export const dict = {
+  en: {
+    ...baseDict.en,
+    ...coreStrings.en,
+    ...paymentsStrings.en,
+    ...studentsStrings.en,
+    ...uniformsStrings.en,
+    ...groupsStrings.en,
+    ...attendanceStrings.en,
+  },
+  ar: {
+    ...baseDict.ar,
+    ...coreStrings.ar,
+    ...paymentsStrings.ar,
+    ...studentsStrings.ar,
+    ...uniformsStrings.ar,
+    ...groupsStrings.ar,
+    ...attendanceStrings.ar,
   },
 } as const;
 

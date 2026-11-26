@@ -1,5 +1,5 @@
 import { api } from "./client";
-import type { Uniform, UniformWithStudent } from "./types";
+import type { PaymentMethod, Receipt, Uniform, UniformWithStudent } from "./types";
 
 export const uniformsApi = {
   list: (filter: { paid?: "true" | "false" } = {}) => {
@@ -14,8 +14,10 @@ export const uniformsApi = {
   togglePaid: (id: string) => api.patch<Uniform>(`/uniforms/${id}/toggle-paid`),
   toggleReceived: (id: string) =>
     api.patch<Uniform>(`/uniforms/${id}/toggle-received`),
-  addPayment: (id: string, body: { amount: number }) =>
+  addPayment: (id: string, body: { amount: number; paymentMethod?: PaymentMethod }) =>
     api.post<Uniform>(`/uniforms/${id}/add-payment`, body),
+  /** What a receipt needs: latest money received, total paid, remaining. */
+  receipt: (id: string) => api.get<Receipt>(`/uniforms/${id}/receipt`),
   remove: (id: string) => api.delete<{ success: true }>(`/uniforms/${id}`),
 
   importMany: (uniforms: unknown[]) =>

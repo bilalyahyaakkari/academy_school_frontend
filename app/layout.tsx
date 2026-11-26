@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#142473",
+  themeColor: "#0a3c55",
   // Keep the app out from under the iPhone's notch / home indicator when it
   // runs full-screen from the home screen.
   viewportFit: "cover",
@@ -44,7 +44,7 @@ export default async function RootLayout({
     >
       <body className="min-h-full bg-background text-foreground">
         <LocaleProvider locale={locale}>{children}</LocaleProvider>
-        <Toaster richColors closeButton />
+        <Toaster closeButton />
       </body>
     </html>
   );

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { uniformsApi } from "@/lib/api/uniforms";
 import { ApiError } from "@/lib/api/client";
+import { getT } from "@/lib/i18n/server";
 
 export type BulkOrderResult =
   | {
@@ -21,24 +22,33 @@ export type BulkOrderResult =
 export async function bulkOrderUniforms(input: {
   studentIds: string[];
   size: string;
-  price: number;
+  /** Required: `null` (an empty price field) is rejected, never treated as 0. */
+  price: number | null;
   isPaid: boolean;
 }): Promise<BulkOrderResult> {
+  const t = await getT();
   if (input.studentIds.length === 0) {
-    return { success: false, error: "Pick at least one student" };
+    return { success: false, error: t("uniforms.bulk.toast.pickStudents") };
   }
-  if (!input.size.trim()) {
-    return { success: false, error: "Size is required" };
+  const size = input.size.trim();
+  if (!size) {
+    return { success: false, error: t("uniformDialog.validation.emptySize") };
   }
-  if (!Number.isFinite(input.price) || input.price < 0) {
-    return { success: false, error: "Price must be a non-negative number" };
+  if (size.length > 20) {
+    return { success: false, error: t("uniformDialog.validation.sizeTooLong") };
+  }
+  const price = input.price;
+  if (price === null || typeof price !== "number" || !Number.isFinite(price) || price < 0) {
+    return { success: false, error: t("uniforms.bulk.toast.invalidPrice") };
   }
 
   const payload = input.studentIds.map((studentId) => ({
     studentId,
-    size: input.size.trim(),
-    price: input.price,
+    size,
+    price,
     isPaid: input.isPaid,
+    // Explicit, so the backend never has to guess what "paid" means.
+    paidAmount: input.isPaid ? price : 0,
   }));
 
   try {
@@ -53,7 +63,7 @@ export async function bulkOrderUniforms(input: {
   } catch (err) {
     return {
       success: false,
-      error: err instanceof ApiError ? err.message : "Failed to create orders",
+      error: err instanceof ApiError ? err.message : t("uniforms.err.bulkCreate"),
     };
   }
 }

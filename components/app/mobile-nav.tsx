@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -16,9 +16,8 @@ export function MobileNav({ academyName }: { academyName: string }) {
   const pathname = usePathname();
   const t = useT();
 
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
+  // The menu closes when a link is clicked (see the Link onClick below) and
+  // via Radix's onOpenChange (overlay click, Escape, the close button).
 
   return (
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
@@ -27,34 +26,27 @@ export function MobileNav({ academyName }: { academyName: string }) {
           variant="ghost"
           size="icon"
           className="md:hidden"
-          aria-label="Open menu"
+          aria-label={t("shell.menu.open")}
         >
           <Menu className="size-5" />
         </Button>
       </DialogPrimitive.Trigger>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-sea-950/50 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <DialogPrimitive.Content
-          className="fixed inset-y-0 start-0 z-50 flex h-full w-72 flex-col border-e border-slate-800 bg-slate-950 text-slate-200 shadow-xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left rtl:data-[state=closed]:slide-out-to-right rtl:data-[state=open]:slide-in-from-right"
+          className="fixed inset-y-0 start-0 z-50 flex h-full w-72 flex-col border-e border-sidebar-border bg-sidebar text-sidebar-foreground shadow-xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left rtl:data-[state=closed]:slide-out-to-right rtl:data-[state=open]:slide-in-from-right"
         >
           <DialogPrimitive.Title className="sr-only">
-            Navigation
+            {t("shell.menu.title")}
           </DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
-            Main navigation menu
+            {t("shell.menu.desc")}
           </DialogPrimitive.Description>
 
-          {/* Subtle radial accent */}
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(circle_at_30%_0%,rgba(59,130,246,0.18),transparent_60%)]"
-          />
-
           {/* Brand + close */}
-          <div className="relative flex h-24 items-center justify-between gap-3 border-b border-slate-800/80 px-4">
+          <div className="relative flex h-24 items-center justify-between gap-3 border-b border-sidebar-border px-4">
             <div className="flex min-w-0 items-center gap-3">
               <div className="relative shrink-0">
-                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500/40 via-fuchsia-500/30 to-cyan-500/40 blur-xl" />
                 <Image
                   src="/logo.png"
                   alt={academyName}
@@ -71,8 +63,8 @@ export function MobileNav({ academyName }: { academyName: string }) {
               <Button
                 variant="ghost"
                 size="icon"
-                className="text-slate-400 hover:bg-slate-800 hover:text-white"
-                aria-label="Close menu"
+                className="text-sidebar-muted hover:bg-white/[0.08] hover:text-white focus-visible:ring-sea-300"
+                aria-label={t("shell.menu.close")}
               >
                 <X className="size-5" />
               </Button>
@@ -83,7 +75,7 @@ export function MobileNav({ academyName }: { academyName: string }) {
           <nav className="relative flex-1 overflow-y-auto px-3 py-4">
             {NAV_SECTIONS.map((section) => (
               <div key={section.labelKey} className="mb-5 last:mb-0">
-                <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+                <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-widest text-sidebar-muted">
                   {t(section.labelKey)}
                 </p>
                 <div className="space-y-0.5">
@@ -98,10 +90,10 @@ export function MobileNav({ academyName }: { academyName: string }) {
                         href={item.href}
                         onClick={() => setOpen(false)}
                         className={cn(
-                          "flex min-h-11 items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium transition-all active:scale-[0.98]",
+                          "flex min-h-11 items-center gap-3 rounded-lg px-3 py-3 text-[15px] font-medium transition-colors active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sea-300 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar",
                           active
-                            ? "bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25"
-                            : "text-slate-400 hover:bg-slate-800/60 hover:text-white active:bg-slate-800/80",
+                            ? "bg-sidebar-active font-semibold text-sidebar-active-foreground shadow-sm"
+                            : "text-sidebar-muted hover:bg-white/[0.06] hover:text-white active:bg-white/[0.1]",
                         )}
                       >
                         <Icon className="size-5 shrink-0" />
@@ -111,7 +103,7 @@ export function MobileNav({ academyName }: { academyName: string }) {
                         {active && (
                           <span
                             aria-hidden
-                            className="size-1.5 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]"
+                            className="size-1.5 rounded-full bg-sea-900"
                           />
                         )}
                       </Link>

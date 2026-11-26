@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import { Loader2, Plus, X } from "lucide-react";
 import type { UniformWithStudent } from "@/lib/api/types";
 
-type StudentOption = { id: string; fullName: string };
+type StudentOption = { id: string; fullName: string; archived?: boolean };
 
 type Props =
   | {
@@ -59,6 +59,22 @@ export function UniformDialog(props: Props) {
 
   const [addingSize, setAddingSize] = useState(false);
   const [newSize, setNewSize] = useState("");
+
+  // The order's own student is always an option — otherwise editing the order
+  // of a student who has left (not in `students`) would show a blank Select.
+  const studentOptions = useMemo<StudentOption[]>(() => {
+    if (!initial || students.some((s) => s.id === initial.studentId)) {
+      return students;
+    }
+    return [
+      {
+        id: initial.student.id,
+        fullName: initial.student.fullName,
+        archived: initial.student.archived,
+      },
+      ...students,
+    ];
+  }, [students, initial]);
 
   const sizeOptions = useMemo(() => {
     const set = new Set<string>(DEFAULT_SIZES);
@@ -96,7 +112,12 @@ export function UniformDialog(props: Props) {
     setNewSize("");
   };
 
-  const onSubmit = (formData: FormData) => {
+  // onSubmit + preventDefault rather than <form action>: React 19 resets an
+  // action form's uncontrolled fields (price, notes) after every submit — even
+  // when the server rejects it — so a failed save would wipe what was typed.
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
     if (!studentId) {
       toast.error(t("uniformDialog.validation.pickStudent"));
       return;
@@ -159,19 +180,23 @@ export function UniformDialog(props: Props) {
               : t("uniformDialog.title.edit")}
           </DialogTitle>
         </DialogHeader>
-        <form action={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label>{t("uniformDialog.field.student")} *</Label>
+            <Label htmlFor="uniform-student">
+              {t("uniformDialog.field.student")} *
+            </Label>
             <Select value={studentId} onValueChange={setStudentId}>
-              <SelectTrigger>
+              <SelectTrigger id="uniform-student">
                 <SelectValue
                   placeholder={t("uniformDialog.placeholder.student")}
                 />
               </SelectTrigger>
               <SelectContent>
-                {students.map((s) => (
+                {studentOptions.map((s) => (
                   <SelectItem key={s.id} value={s.id}>
-                    {s.fullName}
+                    {s.archived
+                      ? `${s.fullName} · ${t("roster.badge.left")}`
+                      : s.fullName}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -180,10 +205,13 @@ export function UniformDialog(props: Props) {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label>{t("uniformDialog.field.size")} *</Label>
+              <Label htmlFor={addingSize ? "uniform-new-size" : "uniform-size"}>
+                {t("uniformDialog.field.size")} *
+              </Label>
               {addingSize ? (
                 <div className="flex items-center gap-2">
                   <Input
+                    id="uniform-new-size"
                     autoFocus
                     value={newSize}
                     onChange={(e) => setNewSize(e.target.value)}
@@ -233,7 +261,7 @@ export function UniformDialog(props: Props) {
                 </div>
               ) : (
                 <Select value={size} onValueChange={onSelectChange}>
-                  <SelectTrigger>
+                  <SelectTrigger id="uniform-size">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -254,9 +282,11 @@ export function UniformDialog(props: Props) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="price">{t("uniformDialog.field.price")} *</Label>
+              <Label htmlFor="uniform-price">
+                {t("uniformDialog.field.price")} *
+              </Label>
               <Input
-                id="price"
+                id="uniform-price"
                 name="price"
                 type="number"
                 min={0}
@@ -269,34 +299,34 @@ export function UniformDialog(props: Props) {
 
           <div className="flex items-center gap-2">
             <input
-              id="isPaid"
+              id="uniform-isPaid"
               type="checkbox"
               checked={isPaid}
               onChange={(e) => setIsPaid(e.target.checked)}
               className="size-4 rounded border-border"
             />
-            <Label htmlFor="isPaid" className="cursor-pointer">
+            <Label htmlFor="uniform-isPaid" className="cursor-pointer">
               {t("uniformDialog.field.alreadyPaid")}
             </Label>
           </div>
 
           <div className="flex items-center gap-2">
             <input
-              id="isReceived"
+              id="uniform-isReceived"
               type="checkbox"
               checked={isReceived}
               onChange={(e) => setIsReceived(e.target.checked)}
               className="size-4 rounded border-border"
             />
-            <Label htmlFor="isReceived" className="cursor-pointer">
+            <Label htmlFor="uniform-isReceived" className="cursor-pointer">
               {t("uniformDialog.field.alreadyReceived")}
             </Label>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">{t("uniformDialog.field.notes")}</Label>
+            <Label htmlFor="uniform-notes">{t("uniformDialog.field.notes")}</Label>
             <Textarea
-              id="notes"
+              id="uniform-notes"
               name="notes"
               rows={3}
               defaultValue={initial?.notes ?? ""}

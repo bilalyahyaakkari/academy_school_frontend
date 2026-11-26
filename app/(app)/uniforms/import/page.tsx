@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { getT } from "@/lib/i18n/server";
 
-export const metadata = { title: "Import uniforms — Academy" };
+export async function generateMetadata() {
+  const t = await getT();
+  return { title: `${t("uniforms.import.title")} — Academy` };
+}
 
 export default async function ImportUniformsPage() {
   const t = await getT();
@@ -62,6 +65,12 @@ export default async function ImportUniformsPage() {
               requiredLabel={t("uniforms.import.required")}
               optionalLabel={t("uniforms.import.optional")}
               hint={t("uniforms.import.col.paid.hint")}
+            />
+            <Field
+              name={t("uniforms.import.col.received")}
+              requiredLabel={t("uniforms.import.required")}
+              optionalLabel={t("uniforms.import.optional")}
+              hint={t("uniforms.import.col.received.hint")}
             />
             <Field
               name={t("uniforms.import.col.notes")}

@@ -20,5 +20,7 @@ declare module "next-auth/jwt" {
   interface JWT {
     id?: string;
     accessToken?: string;
+    /** `exp` of the backend token, in seconds since epoch. */
+    accessTokenExpires?: number;
   }
 }

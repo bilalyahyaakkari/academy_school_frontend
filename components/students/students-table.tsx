@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -25,22 +25,37 @@ import { StudentRowActions } from "@/components/students/student-row-actions";
 import { StudentAvatar } from "@/components/students/student-avatar";
 import { bulkDeleteStudents } from "@/lib/actions/students";
 import { formatAge, cn } from "@/lib/utils";
-import { useT } from "@/lib/i18n/client";
+import { useLocale, useT } from "@/lib/i18n/client";
 import { toast } from "sonner";
-import { Trash2, Loader2, Phone, Archive } from "lucide-react";
+import { Trash2, Loader2, Phone, LogOut } from "lucide-react";
 import type { StudentWithGroup } from "@/lib/api/types";
 
+/**
+ * The parent page passes a `key` derived from the filters, so a filter change
+ * remounts this table and drops the selection. On top of that, every count and
+ * bulk action only ever uses the selected ids that are still *visible* — a
+ * student that left the list (archived, deleted, filtered out after a
+ * revalidation) can never be bulk-deleted by accident.
+ */
 export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const t = useT();
+  const locale = useLocale();
 
-  const allSelected = students.length > 0 && selected.size === students.length;
-  const someSelected = selected.size > 0 && !allSelected;
+  const visibleIds = useMemo(() => students.map((s) => s.id), [students]);
+  const selectedIds = useMemo(
+    () => visibleIds.filter((id) => selected.has(id)),
+    [visibleIds, selected],
+  );
+  const selectedCount = selectedIds.length;
+
+  const allSelected = visibleIds.length > 0 && selectedCount === visibleIds.length;
+  const someSelected = selectedCount > 0 && !allSelected;
 
   const toggleAll = () => {
-    setSelected(allSelected ? new Set() : new Set(students.map((s) => s.id)));
+    setSelected(allSelected ? new Set() : new Set(visibleIds));
   };
 
   const toggleOne = (id: string) => {
@@ -53,14 +68,22 @@ export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
   };
 
   const onBulkDelete = () => {
-    const ids = Array.from(selected);
+    const ids = selectedIds;
+    if (ids.length === 0) {
+      setConfirmOpen(false);
+      return;
+    }
     startTransition(async () => {
       const res = await bulkDeleteStudents(ids);
       if (res.success === false) {
         toast.error(res.error);
         return;
       }
-      toast.success(`Deleted ${res.deleted} student${res.deleted === 1 ? "" : "s"}`);
+      toast.success(
+        res.deleted === 1
+          ? t("students.toast.bulkDeleted.one")
+          : t("students.toast.bulkDeleted", { count: res.deleted }),
+      );
       setSelected(new Set());
       setConfirmOpen(false);
     });
@@ -71,17 +94,17 @@ export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
       {/* Decorative top accent */}
       <span
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent"
+        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sea-500/50 to-transparent"
       />
 
       {/* Bulk action toolbar — appears when at least one row is selected */}
-      {selected.size > 0 && (
-        <div className="flex items-center justify-between gap-3 border-b border-border bg-gradient-to-r from-primary/10 via-primary/5 to-transparent px-4 py-2.5 text-sm">
+      {selectedCount > 0 && (
+        <div className="flex items-center justify-between gap-3 border-b border-border bg-sea-100 px-4 py-2.5 text-sm">
           <span className="flex items-center gap-2 font-medium">
-            <span className="grid size-6 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-              {selected.size}
+            <span className="grid size-6 place-items-center rounded-full bg-sea-800 text-xs font-bold text-white">
+              {selectedCount}
             </span>
-            <span>{t("students.bulk.selected", { count: selected.size }).replace(/^\d+\s*/, "")}</span>
+            <span>{t("students.bulk.selected", { count: selectedCount }).replace(/^\d+\s*/, "")}</span>
           </span>
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
@@ -106,7 +129,7 @@ export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
             <TableRow className="bg-muted/30 hover:bg-muted/30">
               <TableHead className="w-10">
                 <Checkbox
-                  aria-label="Select all"
+                  aria-label={t("students.selectAll")}
                   checked={allSelected ? true : someSelected ? "indeterminate" : false}
                   onCheckedChange={toggleAll}
                 />
@@ -115,7 +138,6 @@ export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
               <TableHead>{t("table.age")}</TableHead>
               <TableHead>{t("table.group")}</TableHead>
               <TableHead>{t("table.parentPhone")}</TableHead>
-              <TableHead>{t("table.status")}</TableHead>
               <TableHead className="text-end">{t("table.actions")}</TableHead>
             </TableRow>
           </TableHeader>
@@ -133,30 +155,33 @@ export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
                 >
                   <TableCell>
                     <Checkbox
-                      aria-label={`Select ${s.fullName}`}
+                      aria-label={t("students.selectOne", { name: s.fullName })}
                       checked={isSelected}
                       onCheckedChange={() => toggleOne(s.id)}
                     />
                   </TableCell>
                   <TableCell>
+                    {/* The name opens the student's page (profile, siblings,
+                        payments) — styled as a link so that's obvious. */}
                     <Link
                       href={`/students/${s.id}`}
-                      className="flex items-center gap-3"
+                      className="group/name flex items-center gap-3 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <StudentAvatar
                         name={s.fullName}
                         size="md"
                         className="transition-transform group-hover:scale-110"
                       />
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold text-foreground transition-colors group-hover:text-primary">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <p className="truncate font-semibold text-sea-800 underline-offset-4 transition-colors group-hover/name:text-sea-700 group-hover/name:underline">
                           {s.fullName}
                         </p>
+                        {s.archived && <LeftBadge label={t("students.badge.left")} />}
                       </div>
                     </Link>
                   </TableCell>
                   <TableCell className="text-sm font-medium">
-                    {formatAge(s.dateOfBirth)}
+                    {formatAge(s.dateOfBirth, locale)}
                   </TableCell>
                   <TableCell>
                     {s.group ? (
@@ -174,30 +199,10 @@ export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
                     {s.phoneNumber ? (
                       <span className="inline-flex items-center gap-1.5 text-sm">
                         <Phone className="size-3 text-muted-foreground" />
-                        {s.phoneNumber}
+                        <span dir="ltr">{s.phoneNumber}</span>
                       </span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {s.archived ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
-                        <Archive className="size-3" />
-                        {t("students.archive.badge")}
-                      </span>
-                    ) : s.isActive ? (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-                        <span className="relative flex size-1.5">
-                          <span className="absolute inset-0 animate-ping-slow rounded-full bg-emerald-500" />
-                          <span className="relative size-1.5 rounded-full bg-emerald-500" />
-                        </span>
-                        {t("common.active")}
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-400/20 bg-slate-500/10 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-400">
-                        {t("common.inactive")}
-                      </span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -225,7 +230,7 @@ export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
               {/* Selection checkbox, padded for a bigger tap target */}
               <span className="grid size-10 shrink-0 place-items-center -m-1.5">
                 <Checkbox
-                  aria-label={`Select ${s.fullName}`}
+                  aria-label={t("students.selectOne", { name: s.fullName })}
                   checked={isSelected}
                   onCheckedChange={() => toggleOne(s.id)}
                 />
@@ -238,11 +243,11 @@ export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
               >
                 <StudentAvatar name={s.fullName} size="md" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-semibold">
+                  <p className="truncate text-base font-semibold text-sea-800">
                     {s.fullName}
                   </p>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                    <span className="font-medium">{formatAge(s.dateOfBirth)}</span>
+                    <span className="font-medium">{formatAge(s.dateOfBirth, locale)}</span>
                     {s.group && (
                       <span className="inline-flex items-center gap-1">
                         <span className="size-1 rounded-full bg-primary/60" />
@@ -252,20 +257,13 @@ export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
                     {s.phoneNumber && (
                       <span className="inline-flex items-center gap-1">
                         <Phone className="size-3" />
-                        {s.phoneNumber}
+                        <span dir="ltr">{s.phoneNumber}</span>
                       </span>
                     )}
                   </div>
-                  {s.archived ? (
-                    <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
-                      <Archive className="size-2.5" />
-                      {t("students.archive.badge")}
-                    </span>
-                  ) : !s.isActive ? (
-                    <span className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-slate-400/20 bg-slate-500/10 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:text-slate-400">
-                      {t("common.inactive")}
-                    </span>
-                  ) : null}
+                  {s.archived && (
+                    <LeftBadge label={t("students.badge.left")} className="mt-1.5" />
+                  )}
                 </div>
               </Link>
 
@@ -282,7 +280,7 @@ export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {t("students.bulk.confirm.title", { count: selected.size })}
+              {t("students.bulk.confirm.title", { count: selectedCount })}
             </DialogTitle>
             <DialogDescription>
               {t("students.bulk.confirm.desc")}
@@ -294,11 +292,25 @@ export function StudentsTable({ students }: { students: StudentWithGroup[] }) {
             </Button>
             <Button variant="destructive" onClick={onBulkDelete} disabled={pending}>
               {pending && <Loader2 className="size-4 animate-spin" />}
-              {t("students.bulk.confirm.btn", { count: selected.size })}
+              {t("students.bulk.confirm.btn", { count: selectedCount })}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </Card>
+  );
+}
+
+function LeftBadge({ label, className }: { label: string; className?: string }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex shrink-0 items-center gap-1 rounded-full border border-transparent bg-sea-100 px-2 py-0.5 text-[10px] font-medium text-sea-900",
+        className,
+      )}
+    >
+      <LogOut className="size-2.5 rtl:rotate-180" />
+      {label}
+    </span>
   );
 }

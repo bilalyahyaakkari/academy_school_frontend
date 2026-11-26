@@ -12,7 +12,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { addUniformPayment } from "@/lib/actions/uniforms";
+import type { ReceiptMessage } from "@/lib/actions/payments";
+import type { PaymentMethod } from "@/lib/api/types";
+import { loadReceipt, PaymentRecordedDialog } from "@/components/payments/receipt-dialog";
 import { useT } from "@/lib/i18n/client";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
@@ -34,15 +44,25 @@ export function UniformAddPaymentDialog({
   onClose,
 }: Props) {
   const t = useT();
-  const remaining = Math.max(0, total - alreadyPaid);
+  // Rounded to cents: 50 − 42.14 is 7.859999… in floating point, and an
+  // unrounded `max` makes the browser reject "7.86" ("must be ≤ 7.859999").
+  const remaining = Number(Math.max(0, total - alreadyPaid).toFixed(2));
   const [amount, setAmount] = useState<string>(remaining.toFixed(2));
+  const [method, setMethod] = useState<PaymentMethod>("CASH");
   const [pending, startTransition] = useTransition();
+  // Set once the payment is saved: the dialog then offers a WhatsApp receipt.
+  const [receipt, setReceipt] = useState<ReceiptMessage | null>(null);
 
   const numericAmount = Number(amount);
   const willCover =
     Number.isFinite(numericAmount) && numericAmount >= remaining && remaining > 0;
 
-  const onSubmit = (formData: FormData) => {
+  // onSubmit rather than <form action>, so React 19 doesn't reset the form
+  // when the server rejects the payment.
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    formData.set("paymentMethod", method);
     startTransition(async () => {
       const res = await addUniformPayment(uniformId, formData);
       if (res.success === false) {
@@ -56,9 +76,19 @@ export function UniformAddPaymentDialog({
               amount: formatCurrency(numericAmount),
             }),
       );
-      onClose();
+      // Offer a receipt (a link the admin clicks — opened from here, after
+      // an await, it would be popup-blocked).
+      const r = await loadReceipt("UNIFORM", uniformId);
+      if (r) setReceipt(r);
+      else onClose();
     });
   };
+
+  if (receipt) {
+    return (
+      <PaymentRecordedDialog studentName={studentName} receipt={receipt} onClose={onClose} />
+    );
+  }
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
@@ -94,15 +124,15 @@ export function UniformAddPaymentDialog({
           </div>
         </div>
 
-        <form action={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="amount">{t("uniforms.payment.amount")} *</Label>
+            <Label htmlFor="uniform-payment-amount">{t("uniforms.payment.amount")} *</Label>
             <Input
-              id="amount"
+              id="uniform-payment-amount"
               name="amount"
               type="number"
               min={0.01}
-              max={remaining || total}
+              max={Number((remaining || total).toFixed(2))}
               step="0.01"
               required
               value={amount}
@@ -130,6 +160,22 @@ export function UniformAddPaymentDialog({
                 {t("uniforms.payment.half")}
               </Button>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>{t("payments.field.method")}</Label>
+            <Select value={method} onValueChange={(v) => setMethod(v as PaymentMethod)}>
+              <SelectTrigger aria-label={t("payments.field.method")}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CASH">{t("payments.method.CASH")}</SelectItem>
+                <SelectItem value="BANK_TRANSFER">
+                  {t("payments.method.BANK_TRANSFER")}
+                </SelectItem>
+                <SelectItem value="OTHER">{t("payments.method.OTHER")}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <DialogFooter>

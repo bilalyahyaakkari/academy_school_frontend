@@ -22,6 +22,8 @@ import {
 import { updatePayment } from "@/lib/actions/payments";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { formatCurrency } from "@/lib/utils";
+import { useT } from "@/lib/i18n/client";
 
 type Payment = {
   id: string;
@@ -32,6 +34,8 @@ type Payment = {
   notes: string | null;
 };
 
+type Method = "CASH" | "BANK_TRANSFER" | "OTHER";
+
 export function PaymentEditDialog({
   payment,
   onClose,
@@ -39,18 +43,39 @@ export function PaymentEditDialog({
   payment: Payment;
   onClose: () => void;
 }) {
+  const t = useT();
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState(payment.status);
-  const [method, setMethod] = useState(payment.paymentMethod ?? "CASH");
+  const [method, setMethod] = useState<Method>(payment.paymentMethod ?? "CASH");
 
-  const onSubmit = (formData: FormData) => {
+  // Highest valid partial amount: one cent under the total.
+  const partialMax = Math.max(0, Number((payment.amount - 0.01).toFixed(2)));
+
+  // onSubmit rather than <form action>: React 19 resets an action form's
+  // uncontrolled fields after every submit, even a failed one.
+  const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
     formData.set("paymentId", payment.id);
     formData.set("status", status);
     formData.set("paymentMethod", method);
+    formData.set("total", String(payment.amount));
+
+    if (status === "PARTIAL") {
+      const paid = Number(formData.get("paidAmount"));
+      if (!Number.isFinite(paid) || paid <= 0 || paid >= payment.amount) {
+        toast.error(
+          t("payments.validation.partialRange", { total: formatCurrency(payment.amount) }),
+        );
+        return;
+      }
+    }
+
     startTransition(async () => {
       const res = await updatePayment(formData);
       if (res.success) {
-        toast.success("Payment updated");
+        toast.success(t("payments.edit.toast.saved"));
+        // Unmounts the dialog, so it opens fresh next time.
         onClose();
       } else {
         toast.error(res.error);
@@ -62,67 +87,76 @@ export function PaymentEditDialog({
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit payment</DialogTitle>
+          <DialogTitle>{t("payments.edit.title")}</DialogTitle>
         </DialogHeader>
-        <form action={onSubmit} className="space-y-4">
+        <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label>Status</Label>
+            <Label>{t("table.status")}</Label>
             <Select value={status} onValueChange={(v) => setStatus(v as Payment["status"])}>
-              <SelectTrigger>
+              <SelectTrigger aria-label={t("table.status")}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="PAID">Paid</SelectItem>
-                <SelectItem value="PARTIAL">Partial</SelectItem>
-                <SelectItem value="UNPAID">Unpaid</SelectItem>
+                <SelectItem value="PAID">{t("common.paid")}</SelectItem>
+                <SelectItem value="PARTIAL">{t("common.partial")}</SelectItem>
+                <SelectItem value="UNPAID">{t("common.unpaid")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {status === "PARTIAL" && (
             <div className="space-y-2">
-              <Label htmlFor="paidAmount">Paid amount (max {payment.amount})</Label>
+              <Label htmlFor="paidAmount">
+                {t("payments.edit.paidAmount", { total: formatCurrency(payment.amount) })}
+              </Label>
               <Input
                 id="paidAmount"
                 name="paidAmount"
                 type="number"
                 step="0.01"
-                min={0}
-                max={payment.amount}
-                defaultValue={payment.paidAmount}
+                min={0.01}
+                max={partialMax}
+                defaultValue={
+                  payment.paidAmount > 0 && payment.paidAmount < payment.amount
+                    ? payment.paidAmount
+                    : undefined
+                }
                 required
               />
+              <p className="text-xs text-muted-foreground">{t("payments.edit.partialHint")}</p>
             </div>
           )}
 
           {status !== "UNPAID" && (
             <div className="space-y-2">
-              <Label>Payment method</Label>
-              <Select value={method} onValueChange={(v) => setMethod(v as typeof method)}>
-                <SelectTrigger>
+              <Label>{t("payments.field.method")}</Label>
+              <Select value={method} onValueChange={(v) => setMethod(v as Method)}>
+                <SelectTrigger aria-label={t("payments.field.method")}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="CASH">Cash</SelectItem>
-                  <SelectItem value="BANK_TRANSFER">Bank transfer</SelectItem>
-                  <SelectItem value="OTHER">Other</SelectItem>
+                  <SelectItem value="CASH">{t("payments.method.CASH")}</SelectItem>
+                  <SelectItem value="BANK_TRANSFER">
+                    {t("payments.method.BANK_TRANSFER")}
+                  </SelectItem>
+                  <SelectItem value="OTHER">{t("payments.method.OTHER")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes">{t("payments.field.notes")}</Label>
             <Textarea id="notes" name="notes" rows={3} defaultValue={payment.notes ?? ""} />
           </div>
 
           <DialogFooter>
             <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button type="submit" disabled={pending}>
               {pending && <Loader2 className="size-4 animate-spin" />}
-              Save
+              {t("common.save")}
             </Button>
           </DialogFooter>
         </form>

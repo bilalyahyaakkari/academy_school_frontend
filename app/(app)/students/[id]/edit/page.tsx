@@ -6,6 +6,7 @@ import { StudentForm } from "@/components/students/student-form";
 import { updateStudent } from "@/lib/actions/students";
 import { PageHeader } from "@/components/app/page-header";
 import { birthYear } from "@/lib/utils";
+import { getT } from "@/lib/i18n/server";
 
 type Params = Promise<{ id: string }>;
 
@@ -19,16 +20,16 @@ export default async function EditStudentPage({ params }: { params: Params }) {
     if (err instanceof ApiError && err.status === 404) notFound();
     throw err;
   }
-  const groups = await groupsApi.list();
+  const [groups, t] = await Promise.all([groupsApi.list(), getT()]);
 
   const action = updateStudent.bind(null, id);
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Edit ${student.fullName}`}
+        title={t("students.edit.title", { name: student.fullName })}
         backHref={`/students/${id}`}
-        backLabel={`Back to ${student.fullName}`}
+        backLabel={t("students.backToName", { name: student.fullName })}
       />
       <StudentForm
         groups={groups.map((g) => ({
@@ -42,14 +43,16 @@ export default async function EditStudentPage({ params }: { params: Params }) {
           id: student.id,
           fullName: student.fullName,
           birthYear: birthYear(student.dateOfBirth),
+          dateOfBirth: student.dateOfBirth,
           phoneNumber: student.phoneNumber ?? undefined,
+          address: student.address ?? undefined,
+          school: student.school ?? undefined,
           groupId: student.groupId,
-          isActive: student.isActive,
           monthlyFee: student.monthlyFee,
           notes: student.notes ?? undefined,
         }}
         action={action}
-        submitLabel="Save changes"
+        submitLabel={t("studentForm.submit.save")}
       />
     </div>
   );

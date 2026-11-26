@@ -16,7 +16,8 @@ export async function GET() {
     { key: "birthYear", label: "Year of birth" },
     { key: "parentPhone", label: "Parent phone" },
     { key: "group", label: "Group" },
-    { key: "isActive", label: "Status" },
+    { key: "school", label: "School" },
+    { key: "address", label: "Address" },
     { key: "monthlyFeeOverride", label: "Monthly fee (override)" },
     { key: "notes", label: "Notes" },
   ];
@@ -25,9 +26,10 @@ export async function GET() {
     {
       fullName: "Ali Hassan",
       birthYear: "2015",
-      parentPhone: "+963900000000",
+      parentPhone: "+961 70 123 456",
       group: "", // optional — leave blank to skip
-      isActive: "Active", // or "Inactive"
+      school: "", // optional
+      address: "", // optional
       monthlyFeeOverride: "", // optional — blank means inherit from group
       notes: "",
     },

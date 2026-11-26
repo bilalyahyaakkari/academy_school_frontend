@@ -10,23 +10,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { MONTH_NAMES } from "@/lib/utils";
+import { ARABIC_MONTH_NAMES, MONTH_NAMES, currentYearMonth } from "@/lib/utils";
 import { useLocale, useT } from "@/lib/i18n/client";
-
-const ARABIC_MONTHS_LEVANTINE = [
-  "كانون الثاني",
-  "شباط",
-  "آذار",
-  "نيسان",
-  "أيار",
-  "حزيران",
-  "تموز",
-  "آب",
-  "أيلول",
-  "تشرين الأول",
-  "تشرين الثاني",
-  "كانون الأول",
-];
 
 /**
  * Month/year stepper. Shared by every month-scoped screen — pass `basePath` to
@@ -42,11 +27,17 @@ export function MonthPicker({
   basePath?: string;
 }) {
   const router = useRouter();
-  const now = new Date();
-  const years = Array.from({ length: 6 }, (_, i) => now.getFullYear() - 3 + i);
+  const now = currentYearMonth();
+  // now-3 … now+2, plus the selected year when it's outside that window
+  // (e.g. ?year=2019) — otherwise the Select would show a blank value.
+  const years = Array.from({ length: 6 }, (_, i) => now.year - 3 + i);
+  if (!years.includes(year)) {
+    years.push(year);
+    years.sort((a, b) => a - b);
+  }
   const locale = useLocale();
   const t = useT();
-  const monthLabels = locale === "ar" ? ARABIC_MONTHS_LEVANTINE : MONTH_NAMES;
+  const monthLabels = locale === "ar" ? ARABIC_MONTH_NAMES : MONTH_NAMES;
 
   const go = (y: number, m: number) => {
     router.push(`${basePath}?year=${y}&month=${m}`);
@@ -65,11 +56,17 @@ export function MonthPicker({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <Button variant="outline" size="icon" onClick={prev}>
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={prev}
+        aria-label={t("payments.monthPicker.prev")}
+        title={t("payments.monthPicker.prev")}
+      >
         <ChevronLeft className="size-4 rtl:rotate-180" />
       </Button>
       <Select value={String(month)} onValueChange={(v) => go(year, Number(v))}>
-        <SelectTrigger className="w-40">
+        <SelectTrigger className="w-40" aria-label={t("payments.monthPicker.month")}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -81,7 +78,7 @@ export function MonthPicker({
         </SelectContent>
       </Select>
       <Select value={String(year)} onValueChange={(v) => go(Number(v), month)}>
-        <SelectTrigger className="w-28">
+        <SelectTrigger className="w-28" aria-label={t("payments.monthPicker.year")}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -92,14 +89,16 @@ export function MonthPicker({
           ))}
         </SelectContent>
       </Select>
-      <Button variant="outline" size="icon" onClick={next}>
+      <Button
+        variant="outline"
+        size="icon"
+        onClick={next}
+        aria-label={t("payments.monthPicker.next")}
+        title={t("payments.monthPicker.next")}
+      >
         <ChevronRight className="size-4 rtl:rotate-180" />
       </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => go(now.getFullYear(), now.getMonth() + 1)}
-      >
+      <Button variant="ghost" size="sm" onClick={() => go(now.year, now.month)}>
         {t("payments.monthPicker.thisMonth")}
       </Button>
     </div>
